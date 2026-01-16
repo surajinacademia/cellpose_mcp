@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "MCP server for AI-powered Cellpose cell segmentation"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "BSD-3-Clause"}
+license = {text = "MIT"}
 authors = [
     {name = "Cellpose MCP Contributors"}
 ]
