@@ -1,6 +1,12 @@
 """MCP tools for Cellpose cell segmentation, restoration, and training."""
 
 import os
+
+# Fix OpenMP threading conflicts that can cause model.eval() to hang
+# This must be set BEFORE importing cellpose or any libraries that use OpenMP
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 from pathlib import Path
 from typing import Any
 
@@ -8,12 +14,9 @@ import imageio
 import numpy as np
 from cellpose import io, models
 from cellpose.denoise import CellposeDenoiseModel, DenoiseModel
-from fastmcp import FastMCP
 
-from fastmcp import FastMCP
-
-# MCP instance - will be set by server.py after import
-mcp: FastMCP = FastMCP("Cellpose MCP Server")
+# Import the shared MCP instance
+from cellpose_mcp.mcp_instance import mcp
 
 # Predefined model types
 PRETRAINED_MODELS = [
@@ -78,12 +81,16 @@ def segment_cells_2d(
             img = img[:, :, :4]  # Limit to 4 channels max
 
         # Initialize model
+        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
+        # may show a warning but still works for compatibility with user expectations.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
         # Run segmentation
-        masks, flows, styles, diams = model.eval(
+        # Convert diameter=0 to None for auto-estimation (Cellpose v4 requirement)
+        diameter_param = None if diameter == 0 else diameter
+        result = model.eval(
             img,
-            diameter=diameter,
+            diameter=diameter_param,
             channels=channels,
             flow_threshold=flow_threshold,
             cellprob_threshold=cellprob_threshold,
@@ -92,6 +99,21 @@ def segment_cells_2d(
             normalize=normalize,
             invert=invert,
         )
+        
+        # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
+        if isinstance(result, tuple):
+            if len(result) == 3:
+                masks, flows, diams = result
+                styles = None
+            elif len(result) == 4:
+                masks, flows, styles, diams = result
+            else:
+                raise ValueError(f"Unexpected number of return values: {len(result)}")
+        else:
+            masks = result
+            flows = None
+            styles = None
+            diams = None
 
         # Determine output path
         if output_path is None:
@@ -151,18 +173,35 @@ def segment_cells_3d(
         img = io.imread(image_path)
 
         # Initialize model
+        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
+        # may show a warning but still works for compatibility with user expectations.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
         # Run 3D segmentation
-        masks, flows, styles, diams = model.eval(
+        # Convert diameter=0 to None for auto-estimation (Cellpose v4 requirement)
+        diameter_param = None if diameter == 0 else diameter
+        result = model.eval(
             img,
-            diameter=diameter,
+            diameter=diameter_param,
             channels=channels,
             do_3D=do_3d,
             anisotropy=anisotropy,
             stitch_threshold=stitch_threshold,
             flow3D_smooth=flow3d_smooth,
         )
+
+        # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
+        if isinstance(result, tuple):
+            if len(result) == 3:
+                masks, flows, diams = result
+            elif len(result) == 4:
+                masks, flows, styles, diams = result
+            else:
+                raise ValueError(f"Unexpected number of return values: {len(result)}")
+        else:
+            masks = result
+            flows = None
+            diams = None
 
         # Determine output path
         if output_path is None:
@@ -210,14 +249,22 @@ def segment_cells_batch(
         Dictionary with batch processing results
     """
     try:
-        # Initialize model once
-        model = models.CellposeModel(gpu=gpu, model_type=model_type)
+        # Initialize model once (use pretrained_model for Cellpose v4+)
+        model = models.CellposeModel(gpu=gpu, pretrained_model=model_type)
 
         results = []
         for img_path in image_paths:
             try:
                 img = io.imread(img_path)
-                masks, flows, styles, diams = model.eval(img, diameter=diameter, batch_size=batch_size)
+                # Convert diameter=0 to None for auto-estimation
+                diameter_param = None if diameter == 0 else diameter
+                result = model.eval(img, diameter=diameter_param, batch_size=batch_size)
+
+                # Handle Cellpose v4 API return values
+                if isinstance(result, tuple):
+                    masks = result[0]
+                else:
+                    masks = result
 
                 # Determine output path
                 img_path_obj = Path(img_path)
@@ -500,6 +547,8 @@ def train_segmentation_model(
             )
 
         # Initialize model
+        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
+        # may show a warning but still works for compatibility with user expectations.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
         # Determine output directory
@@ -575,9 +624,15 @@ def estimate_cell_diameter(
 
         # Initialize model with size estimation
         model = models.CellposeModel(model_type=model_type)
-        _, _, styles, diams = model.eval(img, channels=channels, diameter=None)
+        result = model.eval(img, channels=channels, diameter=None)
 
-        diameter_est = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0])
+        # Handle Cellpose v4 API return values
+        if isinstance(result, tuple):
+            diams = result[-1]  # diams is always the last value
+        else:
+            diams = None
+
+        diameter_est = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0]) if diams is not None else 0.0
 
         return {
             "estimated_diameter": diameter_est,
@@ -663,3 +718,42 @@ def load_image_info(image_path: str) -> dict[str, Any]:
         return info
     except Exception as e:
         return {"error": str(e)}
+
+
+# Make all MCP tools directly callable by exposing their underlying functions
+# This allows tools to be called both as MCP tools (via protocol) and as Python functions (directly)
+_segment_cells_2d_tool = segment_cells_2d
+segment_cells_2d = segment_cells_2d.fn
+
+_segment_cells_3d_tool = segment_cells_3d
+segment_cells_3d = segment_cells_3d.fn
+
+_segment_cells_batch_tool = segment_cells_batch
+segment_cells_batch = segment_cells_batch.fn
+
+_denoise_image_tool = denoise_image
+denoise_image = denoise_image.fn
+
+_deblur_image_tool = deblur_image
+deblur_image = deblur_image.fn
+
+_upsample_image_tool = upsample_image
+upsample_image = upsample_image.fn
+
+_restore_and_segment_tool = restore_and_segment
+restore_and_segment = restore_and_segment.fn
+
+_train_segmentation_model_tool = train_segmentation_model
+train_segmentation_model = train_segmentation_model.fn
+
+_list_available_models_tool = list_available_models
+list_available_models = list_available_models.fn
+
+_estimate_cell_diameter_tool = estimate_cell_diameter
+estimate_cell_diameter = estimate_cell_diameter.fn
+
+_save_masks_tool = save_masks
+save_masks = save_masks.fn
+
+_load_image_info_tool = load_image_info
+load_image_info = load_image_info.fn

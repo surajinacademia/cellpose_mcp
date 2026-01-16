@@ -7,8 +7,8 @@
 ### 1. Install the Package
 
 ```shell
-# Activate your conda environment (e.g., image_analysis)
-conda activate image_analysis
+# Activate your conda environment (e.g., Cellpose_mcp)
+conda activate Cellpose_mcp
 
 # Install cellpose-mcp
 pip install cellpose-mcp
@@ -43,14 +43,14 @@ Restart your AI app and you're ready! Try asking:
 ### Prerequisites
 
 - **Conda installed** (Anaconda or Miniconda)
-- **`image_analysis` conda environment** with Cellpose installed
+- **`Cellpose_mcp` conda environment** with Cellpose installed
 - **Cursor IDE** installed
 
 ### Step-by-Step Installation
 
 1. **Activate your conda environment:**
    ```bash
-   conda activate image_analysis
+   conda activate Cellpose_mcp
    ```
 
 2. **Install Cellpose (if not already installed):**
@@ -71,7 +71,7 @@ Restart your AI app and you're ready! Try asking:
    ```
 
    This will:
-   - Auto-detect your `image_analysis` conda environment
+   - Auto-detect your `Cellpose_mcp` conda environment
    - Find the Cursor configuration file
    - Add cellpose-mcp to your MCP servers
 
@@ -89,7 +89,7 @@ If the auto-installer doesn't work, manually add to Cursor's MCP settings:
 {
   "mcpServers": {
     "cellpose": {
-      "command": "/path/to/miniconda3/envs/image_analysis/bin/python",
+      "command": "/path/to/miniconda3/envs/Cellpose_mcp/bin/python",
       "args": ["-m", "cellpose_mcp"]
     }
   }
@@ -276,24 +276,24 @@ The server exposes 13+ tools for complete Cellpose functionality:
             │ Conda Environment
             ↓
 ┌─────────────────────────────────┐
-│   image_analysis environment     │
+│   Cellpose_mcp environment        │
 │   Python 3.10+                   │
 └─────────────────────────────────┘
 ```
 
 ## 🧪 Testing
 
-Run the test script to verify installation:
+Verify installation by running:
 
 ```bash
-python test_cellpose.py
+conda activate Cellpose_mcp
+python -m cellpose_mcp --help
 ```
 
 This will check:
 - ✅ Cellpose installation
 - ✅ Required dependencies
 - ✅ MCP server initialization
-- ✅ Model loading
 
 ## 🛠 Development Setup
 
@@ -303,13 +303,13 @@ git clone https://github.com/yourusername/cellpose-mcp.git
 cd cellpose-mcp
 
 # Activate conda environment
-conda activate image_analysis
+conda activate Cellpose_mcp
 
 # Install in development mode
 pip install -e ".[dev]"
 
-# Run tests
-python test_cellpose.py
+# Run tests (if you have test files)
+# python test_cellpose.py
 ```
 
 ## 📚 Resources

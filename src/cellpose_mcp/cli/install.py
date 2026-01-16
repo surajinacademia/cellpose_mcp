@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any
 
 
-def find_conda_env(env_name: str = "image_analysis") -> str | None:
+def find_conda_env(env_name: str = "Cellpose_mcp") -> str | None:
     """Find the path to a conda environment.
 
     Args:
-        env_name: Name of the conda environment
+        env_name: Name of the conda environment (default: Cellpose_mcp)
 
     Returns:
         Path to the environment's Python executable, or None if not found
@@ -70,6 +70,7 @@ def get_cursor_config_path() -> Path | None:
 
     if system == "Darwin":  # macOS
         config_paths = [
+            Path.home() / ".cursor" / "mcp.json",  # Primary location for Cursor
             Path.home()
             / "Library"
             / "Application Support"
@@ -79,15 +80,17 @@ def get_cursor_config_path() -> Path | None:
             / "rooveterinaryinc.roo-cline"
             / "settings"
             / "cline_mcp_settings.json",
-            Path.home() / ".cursor" / "mcp_settings.json",
+            Path.home() / ".cursor" / "mcp_settings.json",  # Fallback
         ]
     elif system == "Linux":
         config_paths = [
+            Path.home() / ".cursor" / "mcp.json",  # Primary location for Cursor
             Path.home() / ".config" / "Cursor" / "User" / "globalStorage" / "rooveterinaryinc.roo-cline" / "settings" / "cline_mcp_settings.json",
-            Path.home() / ".cursor" / "mcp_settings.json",
+            Path.home() / ".cursor" / "mcp_settings.json",  # Fallback
         ]
     elif system == "Windows":
         config_paths = [
+            Path.home() / ".cursor" / "mcp.json",  # Primary location for Cursor
             Path.home()
             / "AppData"
             / "Roaming"
@@ -97,10 +100,10 @@ def get_cursor_config_path() -> Path | None:
             / "rooveterinaryinc.roo-cline"
             / "settings"
             / "cline_mcp_settings.json",
-            Path.home() / ".cursor" / "mcp_settings.json",
+            Path.home() / ".cursor" / "mcp_settings.json",  # Fallback
         ]
     else:
-        config_paths = [Path.home() / ".cursor" / "mcp_settings.json"]
+        config_paths = [Path.home() / ".cursor" / "mcp.json"]
 
     for config_path in config_paths:
         if config_path.exists() or config_path.parent.exists():
@@ -110,12 +113,12 @@ def get_cursor_config_path() -> Path | None:
     return config_paths[0]
 
 
-def install_for_cursor(python_path: str | None = None, env_name: str = "image_analysis") -> bool:
+def install_for_cursor(python_path: str | None = None, env_name: str = "Cellpose_mcp") -> bool:
     """Install cellpose-mcp configuration for Cursor.
 
     Args:
         python_path: Path to Python executable (auto-detected if None)
-        env_name: Name of conda environment to use
+        env_name: Name of conda environment to use (default: Cellpose_mcp)
 
     Returns:
         True if installation succeeded, False otherwise
@@ -164,10 +167,14 @@ def install_for_cursor(python_path: str | None = None, env_name: str = "image_an
         config["mcpServers"] = {}
 
     # Add or update cellpose server config
+    # Include environment variables to fix OpenMP threading conflicts
     config["mcpServers"]["cellpose"] = {
         "command": python_path,
         "args": ["-m", "cellpose_mcp"],
-        "env": {},
+        "env": {
+            "KMP_DUPLICATE_LIB_OK": "TRUE",
+            "OMP_NUM_THREADS": "1",
+        },
     }
 
     # Write config
@@ -205,8 +212,8 @@ def main() -> None:
     parser.add_argument(
         "--env-name",
         type=str,
-        default="image_analysis",
-        help="Name of conda environment (default: image_analysis)",
+        default="Cellpose_mcp",
+        help="Name of conda environment (default: Cellpose_mcp)",
     )
 
     args = parser.parse_args()
