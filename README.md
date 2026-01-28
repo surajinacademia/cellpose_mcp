@@ -8,6 +8,12 @@
 
 MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol (MCP). Perfect for AI-assisted microscopy analysis with Claude Desktop, Cursor, and other LLM applications.
 
+## Links
+
+- [Repository](https://github.com/surajinacademia/cellpose_mcp)
+- [Issues](https://github.com/surajinacademia/cellpose_mcp/issues)
+- [Pull Requests](https://github.com/surajinacademia/cellpose_mcp/pulls)
+
 > **📌 Project Origin**: This project is **inspired by and adapted from** [napari-mcp](https://github.com/royerlab/napari-mcp) by the royerlab team. The architecture, structure, and implementation patterns follow the excellent design established by napari-mcp, adapted for Cellpose cell segmentation workflows. This project is **open source and free to fork, modify, and experiment with** - feel free to use it as a starting point for your own MCP servers!
 
 ## 🚀 Quick Start (3 Steps)
@@ -165,6 +171,7 @@ Key features:
 
 ## 📚 Resources
 
+- **[cellpose-mcp Repository](https://github.com/surajinacademia/cellpose_mcp)** - This project on GitHub
 - **[Cellpose](https://github.com/MouseLand/cellpose)** - Cell segmentation library
 - **[Model Context Protocol](https://modelcontextprotocol.io/)** - MCP specification
 - **[FastMCP](https://github.com/jlowin/fastmcp)** - Python MCP framework
@@ -189,7 +196,7 @@ Contributions are welcome! Please:
 
 BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
 
-This project is adapted from [napari-mcp](https://github.com/royerlab/napari-mcp) (Copyright (c) 2025, Ilan Theodoro), which is also licensed under BSD-3-Clause.
+This project is adapted from [napari-mcp](https://github.com/royerlab/napari-mcp) (Copyright (c) 2025, Ilan Theodoro), which is licensed under BSD-2-Clause.
 
 ## 🙏 Acknowledgments
 
