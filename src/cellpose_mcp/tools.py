@@ -49,7 +49,7 @@ def segment_cells_2d(
     flow_threshold: float = 0.4,
     cellprob_threshold: float = 0.0,
     min_size: int = 15,
-    gpu: bool = False,
+    gpu: bool = True,
     augment: bool = False,
     normalize: bool = True,
     invert: bool = False,
@@ -148,7 +148,7 @@ def segment_cells_3d(
     stitch_threshold: float = 0.0,
     flow3d_smooth: float = 0,
     channels: list[int] | None = None,
-    gpu: bool = False,
+    gpu: bool = True,
     output_path: str | None = None,
 ) -> dict[str, Any]:
     """Segment cells in a 3D volume using Cellpose.
@@ -232,7 +232,7 @@ def segment_cells_batch(
     model_type: str = "cpsam",
     diameter: float = 0,
     output_dir: str | None = None,
-    gpu: bool = False,
+    gpu: bool = True,
     batch_size: int = 8,
 ) -> dict[str, Any]:
     """Segment cells in multiple images in batch.
@@ -304,7 +304,7 @@ def denoise_image(
     model_type: str = "denoise_cyto3",
     channels: list[int] | None = None,
     diameter: float = 30.0,
-    gpu: bool = False,
+    gpu: bool = True,
     output_path: str | None = None,
 ) -> dict[str, Any]:
     """Denoise a microscopy image using Cellpose restoration models.
@@ -353,7 +353,7 @@ def deblur_image(
     model_type: str = "deblur_cyto3",
     channels: list[int] | None = None,
     diameter: float = 30.0,
-    gpu: bool = False,
+    gpu: bool = True,
     output_path: str | None = None,
 ) -> dict[str, Any]:
     """Deblur a microscopy image using Cellpose restoration models.
@@ -397,7 +397,7 @@ def upsample_image(
     model_type: str = "upsample_cyto3",
     scale_factor: int = 2,
     channels: list[int] | None = None,
-    gpu: bool = False,
+    gpu: bool = True,
     output_path: str | None = None,
 ) -> dict[str, Any]:
     """Upsample a microscopy image using Cellpose restoration models.
@@ -442,7 +442,7 @@ def restore_and_segment(
     segmentation_model: str = "cyto3",
     diameter: float = 0,
     channels: list[int] | None = None,
-    gpu: bool = False,
+    gpu: bool = True,
     output_path_mask: str | None = None,
     output_path_restored: str | None = None,
 ) -> dict[str, Any]:
@@ -510,7 +510,7 @@ def train_segmentation_model(
     batch_size: int = 8,
     test_dir: str | None = None,
     test_labels_dir: str | None = None,
-    gpu: bool = False,
+    gpu: bool = True,
     output_dir: str | None = None,
 ) -> dict[str, Any]:
     """Train a custom Cellpose segmentation model.
@@ -608,6 +608,7 @@ def estimate_cell_diameter(
     image_path: str,
     model_type: str = "cpsam",
     channels: list[int] | None = None,
+    gpu: bool = True,
 ) -> dict[str, Any]:
     """Estimate cell diameter from an image using Cellpose size model.
 
@@ -615,6 +616,7 @@ def estimate_cell_diameter(
         image_path: Path to input image
         model_type: Model type to use for estimation
         channels: Channel specification
+        gpu: Whether to use GPU acceleration
 
     Returns:
         Dictionary with estimated diameter and confidence
@@ -623,7 +625,7 @@ def estimate_cell_diameter(
         img = io.imread(image_path)
 
         # Initialize model with size estimation
-        model = models.CellposeModel(model_type=model_type)
+        model = models.CellposeModel(gpu=gpu, model_type=model_type)
         result = model.eval(img, channels=channels, diameter=None)
 
         # Handle Cellpose v4 API return values
