@@ -31,7 +31,23 @@ pip install -e .
 # For Cursor IDE
 cellpose-mcp-install cursor
 
-# For other applications (Claude Desktop, Claude Code, Cline, etc.)
+# For Claude Code - add a .mcp.json file to your project root:
+cat > .mcp.json << 'EOF'
+{
+  "mcpServers": {
+    "cellpose": {
+      "command": "python",
+      "args": ["-m", "cellpose_mcp"],
+      "env": {
+        "KMP_DUPLICATE_LIB_OK": "TRUE",
+        "OMP_NUM_THREADS": "1"
+      }
+    }
+  }
+}
+EOF
+
+# For other applications (Claude Desktop, Cline, etc.)
 cellpose-mcp-install --help # See all options
 ```
 
@@ -96,7 +112,7 @@ The server exposes 13+ tools for complete Cellpose functionality:
 |-------------|---------|--------|
 | **Cursor IDE** | `cellpose-mcp-install cursor` | ✅ Full Support |
 | **Claude Desktop** | `cellpose-mcp-install claude-desktop` | 🚧 Coming Soon |
-| **Claude Code** | `cellpose-mcp-install claude-code` | 🚧 Coming Soon |
+| **Claude Code** | Add `.mcp.json` to project root | ✅ Full Support |
 | **Cline (VS Code)** | `cellpose-mcp-install cline-vscode` | 🚧 Coming Soon |
 | **Cline (Cursor)** | `cellpose-mcp-install cline-cursor` | 🚧 Coming Soon |
 
@@ -172,6 +188,8 @@ Contributions are welcome! Please:
 ## 📄 License
 
 BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
+
+This project is adapted from [napari-mcp](https://github.com/royerlab/napari-mcp) (Copyright (c) 2025, Ilan Theodoro), which is also licensed under BSD-3-Clause.
 
 ## 🙏 Acknowledgments
 
