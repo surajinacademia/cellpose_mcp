@@ -43,7 +43,7 @@ PRETRAINED_MODELS = [
 @mcp.tool()
 def segment_cells_2d(
     image_path: str,
-    model_type: str = "cyto2",
+    model_type: str = "cpsam",
     diameter: float = 0,
     channels: list[int] | None = None,
     flow_threshold: float = 0.4,
@@ -141,7 +141,7 @@ def segment_cells_2d(
 @mcp.tool()
 def segment_cells_3d(
     image_path: str,
-    model_type: str = "cyto2",
+    model_type: str = "cpsam",
     diameter: float = 0,
     do_3d: bool = True,
     anisotropy: float | None = None,
@@ -229,7 +229,7 @@ def segment_cells_3d(
 @mcp.tool()
 def segment_cells_batch(
     image_paths: list[str],
-    model_type: str = "cyto2",
+    model_type: str = "cpsam",
     diameter: float = 0,
     output_dir: str | None = None,
     gpu: bool = False,
@@ -606,7 +606,7 @@ def list_available_models() -> dict[str, Any]:
 @mcp.tool()
 def estimate_cell_diameter(
     image_path: str,
-    model_type: str = "cyto2",
+    model_type: str = "cpsam",
     channels: list[int] | None = None,
 ) -> dict[str, Any]:
     """Estimate cell diameter from an image using Cellpose size model.

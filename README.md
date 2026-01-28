@@ -1,6 +1,12 @@
 # Cellpose MCP Server
 
-🔬 MCP server for AI-powered Cellpose cell segmentation. Connect Claude, ChatGPT, Cursor, and other LLMs to Cellpose for automated cell segmentation workflows. Perfect for microscopy image analysis and building intelligent segmentation tools.
+[![Tests](https://github.com/surajinacademia/cellpose_mcp/workflows/Tests/badge.svg)](https://github.com/surajinacademia/cellpose_mcp/actions)
+[![codecov](https://codecov.io/gh/surajinacademia/cellpose_mcp/graph/badge.svg?token=PLACEHOLDER)](https://codecov.io/gh/surajinacademia/cellpose_mcp)
+[![PyPI version](https://badge.fury.io/py/cellpose-mcp.svg)](https://badge.fury.io/py/cellpose-mcp)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol (MCP). Perfect for AI-assisted microscopy analysis with Claude Desktop, Cursor, and other LLM applications.
 
 ## 🚀 Quick Start (3 Steps)
 
@@ -14,8 +20,8 @@ conda activate Cellpose_mcp
 pip install cellpose-mcp
 
 # OR for development:
-git clone https://github.com/yourusername/cellpose-mcp.git
-cd cellpose-mcp
+git clone https://github.com/surajinacademia/cellpose_mcp.git
+cd cellpose_mcp
 pip install -e .
 ```
 
@@ -295,29 +301,31 @@ This will check:
 - ✅ Required dependencies
 - ✅ MCP server initialization
 
-## 🛠 Development Setup
+## 🧪 Development Setup
 
-```shell
+```bash
 # Clone repository
-git clone https://github.com/yourusername/cellpose-mcp.git
-cd cellpose-mcp
+git clone https://github.com/surajinacademia/cellpose_mcp.git
+cd cellpose_mcp
 
 # Activate conda environment
-conda activate Cellpose_mcp
+conda activate image_analysis  # or Cellpose_mcp
 
-# Install in development mode
-pip install -e ".[dev]"
+# Install with development dependencies
+pip install -e ".[test,dev]"
 
-# Run tests (if you have test files)
-# python test_cellpose.py
+# Run tests
+pytest -m "not slow"  # Skip slow tests
+pytest --cov=src --cov-report=html  # With coverage
 ```
 
 ## 📚 Resources
 
-- [Cellpose Documentation](https://cellpose.readthedocs.io/) - Cellpose library docs
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification
-- [FastMCP](https://github.com/jlowin/fastmcp) - Python MCP framework
-- [Cursor IDE](https://cursor.sh/) - AI-powered code editor
+- **[Cellpose](https://github.com/MouseLand/cellpose)** - Cell segmentation library
+- **[Model Context Protocol](https://modelcontextprotocol.io/)** - MCP specification
+- **[FastMCP](https://github.com/jlowin/fastmcp)** - Python MCP framework
+- **[Cursor IDE](https://cursor.sh/)** - AI-powered code editor
+- **[Napari MCP](https://github.com/royerlab/napari-mcp)** - Architectural inspiration
 
 ## ⚠️ Security Notice
 
@@ -330,13 +338,16 @@ Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes with tests
-4. Commit changes (`git commit -m 'Add amazing feature'`)
-5. Push to branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+4. Run pre-commit hooks: `pre-commit run --all-files`
+5. Commit changes (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+**→ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines**
 
 ## 📄 License
 
-BSD 3-Clause License - see [LICENSE](LICENSE) file for details.
+BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -345,4 +356,6 @@ BSD 3-Clause License - see [LICENSE](LICENSE) file for details.
 - [Napari MCP](https://github.com/royerlab/napari-mcp) for architectural inspiration
 - [Anthropic](https://www.anthropic.com/) for Claude and MCP development
 
-Built with ❤️ for the microscopy and AI communities.
+---
+
+**Built with ❤️ for the microscopy and AI communities**

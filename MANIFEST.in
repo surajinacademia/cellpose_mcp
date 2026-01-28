@@ -1,5 +1,9 @@
-include README.md
 include LICENSE
+include README.md
 include pyproject.toml
-recursive-include src *.py
-recursive-include src *.typed
+
+recursive-include src/cellpose_mcp *.py
+recursive-include src/cellpose_mcp *.typed
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude tests *

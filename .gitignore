@@ -1,29 +1,87 @@
-# Byte-compiled / optimized / DLL files
+# Python-generated files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
-dist/
 build/
+dist/
+wheels/
 *.egg-info/
 *.egg
+MANIFEST
 
 # Virtual environments
-venv/
 .venv/
+.env
+venv/
+env/
+ENV/
 
-# IDE
-.idea/
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.cache
+
+# Development tools
+.mypy_cache/
+.ruff_cache/
+.bandit
+bandit-report.json
+safety-report.json
+
+# IDEs and editors
 .vscode/
+.idea/
 *.swp
 *.swo
-
-# OS
+*~
 .DS_Store
 Thumbs.db
 
-# Test/demo files (keep local, don't track)
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Documentation
+docs/_build/
+site/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+tmp/
+
+# Security
+.secrets
+*.pem
+*.key
+
+# MCP specific
+claude_desktop_config.json
+
+# written by setuptools_scm
+**/_version.py
+
+# Cellpose-specific
 demo_images/
 *_masks.png
 *_masks.tif
+*_masks_formatted.png
+*_segmented.png
