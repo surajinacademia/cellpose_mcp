@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cellpose": {
+      "command": "/Users/suraj/miniconda3/bin/python",
+      "args": ["-m", "cellpose_mcp"],
+      "env": {
+        "KMP_DUPLICATE_LIB_OK": "TRUE",
+        "OMP_NUM_THREADS": "1"
+      }
+    }
+  }
+}

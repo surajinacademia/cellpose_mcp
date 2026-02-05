@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cellpose-MCP: AI-Tool for Cell Segmentation and Image Analysis in Cellpose and Napari</title>
+  <style>
+    @font-face {
+      font-family: 'CMU Sans Serif';
+      src: local('CMU Sans Serif'), local('CMUSansSerif'), local('Computer Modern Sans Serif');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: #000;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Convert pt to px: 1pt = 1.333px at 96dpi, so 3456pt = 4608px */
+    /* 4:3 Aspect Ratio: 3456pt × 2592pt (48" × 36") */
+    body {
+      width: 3456pt;
+      /* 48 inches - maintains 4:3 ratio */
+      height: 2592pt;
+      /* 36 inches - maintains 4:3 ratio */
+      max-width: 3456pt;
+      max-height: 2592pt;
+      margin: 0;
+      padding: 0;
+      font-family: 'CMU Sans Serif', 'Computer Modern Sans Serif', 'Latin Modern Sans', 'TeX Gyre Heros', Arial, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      background-color: #000000;
+      color: #e8e8e8;
+      overflow: hidden;
+      transform-origin: top left;
+      box-sizing: border-box;
+    }
+
+    /* ==================== HEADER ==================== */
+    .header {
+      min-height: 320pt;
+      background: #000000;
+      display: flex;
+      align-items: flex-start;
+      padding: 40pt 70pt;
+      gap: 40pt;
+      border-bottom: 4pt solid #00bcd4;
+      position: relative;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -4pt;
+      left: 0;
+      right: 0;
+      height: 4pt;
+      background: #00bcd4;
+    }
+
+    .header-logos {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15pt;
+    }
+
+    .header-logo {
+      width: 160pt;
+      height: 160pt;
+      object-fit: contain;
+      filter: drop-shadow(0 4pt 12pt rgba(0, 188, 212, 0.3));
+    }
+
+    .mcp-logo-small {
+      width: 160pt;
+      height: 160pt;
+      margin-top: 12pt;
+      align-self: center;
+    }
+
+    .header-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .poster-title {
+      color: #ffffff;
+      font-size: 80pt;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0 0 20pt 0;
+      letter-spacing: -1pt;
+    }
+
+    .poster-title .highlight {
+      color: #87CEEB;
+    }
+
+    .authors {
+      color: #e8e8e8;
+      font-size: 40pt;
+      font-weight: 500;
+      margin: 0 0 10pt 0;
+    }
+
+    .affiliations {
+      color: #cccccc;
+      font-size: 32pt;
+      font-weight: 400;
+      margin: 0;
+    }
+
+    sup {
+      font-size: 0.7em;
+      vertical-align: super;
+      line-height: 0;
+    }
+
+    .header-right-logos {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 15pt;
+      justify-content: flex-start;
+    }
+
+    .mcp-logo {
+      width: 200pt;
+      height: auto;
+      filter: invert(1) drop-shadow(0 4pt 12pt rgba(0, 188, 212, 0.3));
+    }
+
+    .badges {
+      display: flex;
+      flex-direction: column;
+      gap: 8pt;
+      align-items: flex-end;
+    }
+
+    .badge {
+      height: 20pt;
+      width: auto;
+      position: absolute;
+    }
+
+    .university-logo {
+      width: 860px;
+      height: auto;
+      object-fit: contain;
+      margin-top: 10pt;
+    }
+
+    /* ==================== ABSTRACT ==================== */
+    .abstract-section {
+      padding: 0;
+      background: transparent;
+      margin-top: 15pt;
+    }
+
+    .abstract-block {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      position: relative;
+    }
+
+    .abstract-block::before {
+      display: none;
+    }
+
+    .abstract-title {
+      font-size: 36pt;
+      font-weight: 700;
+      color: #87CEEB;
+      margin: 0 0 12pt 0;
+      padding-bottom: 8pt;
+      border-bottom: 2pt solid #333333;
+      text-transform: uppercase;
+      letter-spacing: 1pt;
+    }
+
+    .abstract-text {
+      font-size: 22pt;
+      line-height: 1.5;
+      color: #e8e8e8;
+      margin: 0;
+      text-align: justify;
+    }
+
+    /* Inline citation markers like [1], [2], ... */
+    .ref {
+      color: #87CEEB;
+      font-weight: 700;
+    }
+
+    /* ==================== MAIN CONTENT ==================== */
+    .main-content {
+      flex: 1;
+      display: flex;
+      gap: 35pt;
+      padding: 40pt 50pt;
+      min-height: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 35pt;
+      min-width: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    /* ==================== CONTENT BLOCKS ==================== */
+    .block {
+      /* Per-panel theming (override via block-accent-* classes) */
+      --accent: #00bcd4;
+      --accent-rgb: 0, 188, 212;
+
+      background: #000000;
+      border-radius: 30pt;
+      padding: 35pt;
+      border: 2pt solid #333333;
+      position: relative;
+      overflow: hidden;
+      box-sizing: border-box;
+      min-height: 0;
+      /* subtle colored outline so each panel has its own style */
+      box-shadow: 0 0 0 2pt rgba(var(--accent-rgb), 0.16);
+    }
+
+    .block::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4pt;
+      border-radius: 30pt 30pt 0 0;
+      background: var(--accent);
+    }
+
+    /* Panel accent palettes (unique per panel) */
+    .block-accent-cyan {
+      --accent: #00bcd4;
+      --accent-rgb: 0, 188, 212;
+    }
+
+    .block-accent-green {
+      --accent: #00e676;
+      --accent-rgb: 0, 230, 118;
+    }
+
+    .block-accent-teal {
+      --accent: #26c6da;
+      --accent-rgb: 38, 198, 218;
+    }
+
+    .block-accent-orange {
+      --accent: #ffab40;
+      --accent-rgb: 255, 171, 64;
+    }
+
+    .block-accent-pink {
+      --accent: #ff6ec7;
+      --accent-rgb: 255, 110, 199;
+    }
+
+    .block-accent-purple {
+      --accent: #b388ff;
+      --accent-rgb: 179, 136, 255;
+    }
+
+    .block-accent-yellow {
+      --accent: #ffd54f;
+      --accent-rgb: 255, 213, 79;
+    }
+
+    .block-accent-indigo {
+      --accent: #536dfe;
+      --accent-rgb: 83, 109, 254;
+    }
+
+    .block-accent-red {
+      --accent: #ff5252;
+      --accent-rgb: 255, 82, 82;
+    }
+
+    .block-title {
+      font-size: 38pt;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0 0 20pt 0;
+      padding-bottom: 12pt;
+      border-bottom: 2pt solid #333333;
+      text-transform: uppercase;
+      letter-spacing: 1pt;
+    }
+
+    .block-content {
+      font-size: 24pt;
+      line-height: 1.5;
+      color: #e8e8e8;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      max-width: 100%;
+    }
+
+    .block-content p {
+      margin: 0 0 12pt 0;
+    }
+
+    .block-image {
+      display: block;
+      margin: 15pt auto;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10pt;
+      object-fit: contain;
+    }
+
+    /* Slightly reduce Cellpose GUI image size (10% smaller) */
+    .block-image[src="poster_images/cellpose_gui.jpg"] {
+      width: 90%;
+    }
+
+    .block-image[src="poster_images/napari_gui.png"] {
+      border: none;
+      width: 110%;
+      margin-bottom: 0;
+    }
+
+    ul {
+      margin: 10pt 0;
+      padding-left: 40pt;
+    }
+
+    li {
+      font-size: 24pt;
+      line-height: 1.5;
+      color: #e8e8e8;
+      margin-bottom: 10pt;
+    }
+
+    li b,
+    li strong {
+      color: #87CEEB;
+    }
+
+    /* Per-panel highlight styling */
+    .block .block-content b,
+    .block .block-content strong {
+      color: var(--accent);
+    }
+
+    .block .ref {
+      color: var(--accent);
+    }
+
+    /* ==================== ARCHITECTURE DIAGRAM (CSS) ==================== */
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8pt;
+      margin: 15pt 0;
+      flex-wrap: nowrap;
+    }
+
+    .arch-box {
+      background: #333333;
+      color: #ffffff;
+      padding: 14pt 18pt;
+      border-radius: 10pt;
+      font-size: 18pt;
+      font-weight: 600;
+      text-align: center;
+      border: 2pt solid #00bcd4;
+      white-space: nowrap;
+    }
+
+    .block .arch-box {
+      border-color: var(--accent);
+    }
+
+    .arch-box.mcp {
+      background: #333333;
+      border-color: #00bcd4;
+    }
+
+    .arch-box.tool {
+      background: #333333;
+      border-color: #00bcd4;
+    }
+
+    .arch-box.result {
+      background: #333333;
+      border-color: #00bcd4;
+    }
+
+    .arch-arrow {
+      color: #00bcd4;
+      font-size: 28pt;
+      font-weight: bold;
+    }
+
+    .block .arch-arrow {
+      color: var(--accent);
+    }
+
+    /* ==================== TOOL TABLE ==================== */
+    .tool-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12pt 0;
+    }
+
+    .tool-table th {
+      background: #333333;
+      color: var(--accent);
+      font-size: 20pt;
+      padding: 10pt 14pt;
+      text-align: left;
+      border: 1pt solid #1e3a5f;
+    }
+
+    .tool-table td {
+      font-size: 18pt;
+      padding: 8pt 14pt;
+      border: 1pt solid #1e3a5f;
+      color: #e8e8e8;
+    }
+
+    .tool-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tool-name {
+      font-family: 'CMU Sans Serif', 'Computer Modern Sans Serif', 'Latin Modern Sans', Arial, Helvetica, sans-serif;
+      color: #87CEEB;
+      font-size: 17pt;
+    }
+
+    .block .tool-name {
+      color: var(--accent);
+    }
+
+    /* ==================== KEY FINDING / HIGHLIGHT ==================== */
+    .key-finding {
+      background: rgba(0, 188, 212, 0.1);
+      border-radius: 20pt;
+      padding: 18pt 22pt;
+      margin: 12pt 0;
+      border-left: 5pt solid #00e5ff;
+    }
+
+    .block .key-finding {
+      background: rgba(var(--accent-rgb), 0.10);
+      border-left-color: var(--accent);
+    }
+
+    .key-finding p {
+      font-size: 24pt;
+      font-weight: 600;
+      color: #87CEEB;
+      margin: 0;
+    }
+
+    .block .key-finding p {
+      color: var(--accent);
+    }
+
+    /* ==================== STATS BOX ==================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12pt;
+      margin: 15pt 0;
+    }
+
+    .stat-item {
+      background: rgba(0, 188, 212, 0.1);
+      border-radius: 10pt;
+      padding: 16pt;
+      text-align: center;
+      border: 1pt solid #00bcd4;
+    }
+
+    .block .stat-item {
+      background: rgba(var(--accent-rgb), 0.10);
+      border-color: rgba(var(--accent-rgb), 0.55);
+    }
+
+    .stat-number {
+      font-size: 36pt;
+      font-weight: 800;
+      color: #87CEEB;
+      display: block;
+    }
+
+    .block .stat-number {
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 16pt;
+      color: #cccccc;
+      display: block;
+      margin-top: 4pt;
+    }
+
+    /* ==================== CAPTION ==================== */
+    .caption {
+      font-size: 18pt;
+      color: #cccccc;
+      font-style: italic;
+      text-align: center;
+      margin: 2pt 0 0 0;
+      line-height: 1.4;
+    }
+
+    /* ==================== ADVANTAGES GRID ==================== */
+    .adv-section {
+      margin-bottom: 14pt;
+    }
+
+    .adv-title {
+      font-size: 22pt;
+      font-weight: 700;
+      color: #ffab40;
+      margin: 0 0 8pt 0;
+    }
+
+    .adv-list {
+      margin: 0;
+      padding-left: 30pt;
+    }
+
+    .adv-list li {
+      font-size: 21pt;
+      margin-bottom: 6pt;
+      color: #e8e8e8;
+    }
+
+    /* ==================== QR CODE PLACEHOLDER ==================== */
+    .qr-placeholder {
+      width: 140pt;
+      height: 140pt;
+      background: #ffffff;
+      border-radius: 10pt;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10pt auto;
+    }
+
+    .qr-placeholder-inner {
+      width: 120pt;
+      height: 120pt;
+      background: repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 20pt 20pt;
+      border-radius: 4pt;
+      position: relative;
+    }
+
+    .qr-placeholder-inner::after {
+      content: 'QR';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #ffffff;
+      color: #000;
+      font-size: 24pt;
+      font-weight: 800;
+      padding: 6pt 10pt;
+      border-radius: 4pt;
+    }
+
+    /* ==================== WORKFLOW BOX ==================== */
+    .workflow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12pt;
+      margin-bottom: 12pt;
+    }
+
+    .step-num {
+      background: #00bcd4;
+      color: #000;
+      width: 30pt;
+      height: 30pt;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18pt;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 2pt;
+    }
+
+    .block .step-num {
+      background: var(--accent);
+    }
+
+    .step-text {
+      font-size: 21pt;
+      color: #e8e8e8;
+      line-height: 1.4;
+    }
+
+    .step-text .code {
+      font-family: 'CMU Sans Serif', 'Computer Modern Sans Serif', 'Latin Modern Sans', Arial, Helvetica, sans-serif;
+      color: #87CEEB;
+      background: rgba(135, 206, 235, 0.1);
+      padding: 1pt 6pt;
+      border-radius: 4pt;
+      font-size: 19pt;
+    }
+
+    .block .step-text .code {
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.10);
+    }
+
+    /* ==================== FOOTER ==================== */
+    .footer {
+      min-height: 200pt;
+      background: #000000;
+      display: flex;
+      align-items: flex-start;
+      padding: 30pt 60pt;
+      gap: 30pt;
+      border-top: 4pt solid #00bcd4;
+      position: relative;
+    }
+
+    .footer::before {
+      content: '';
+      position: absolute;
+      top: -4pt;
+      left: 0;
+      right: 0;
+      height: 4pt;
+      background: #00bcd4;
+    }
+
+    .references {
+      flex: 3;
+      color: #cccccc;
+      font-size: 19pt;
+      line-height: 1.6;
+    }
+
+    .references b {
+      color: #87CEEB;
+    }
+
+    .resources {
+      flex: 2;
+      color: #cccccc;
+      font-size: 19pt;
+      line-height: 1.6;
+    }
+
+    .resources b {
+      color: #87CEEB;
+    }
+
+    .acknowledgements {
+      flex: 2.5;
+      color: #cccccc;
+      font-size: 18pt;
+      line-height: 1.6;
+    }
+
+    .acknowledgements b {
+      color: #87CEEB;
+    }
+
+    .footer-qr {
+      flex: 1.5;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12pt;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <div class="header">
+    <div class="header-logos">
+      <img src="poster_images/cellpose_logo.png" class="header-logo" alt="Cellpose Logo">
+      <img src="poster_images/mcp_logo.png" class="mcp-logo-small" alt="MCP Logo">
+    </div>
+    <div class="header-text">
+      <h1 class="poster-title"><span class="highlight">Cellpose-MCP:</span> AI-Tool for Cell Segmentation and Image
+        Analysis in Cellpose and Napari</h1>
+      <p class="authors">Suraj Sahu<sup>1</sup> ssahu2@ucmerced.edu</p>
+      <p class="affiliations"><sup>1</sup>Department of Physics, University of California Merced, CA, USA</p>
+
+      <!-- ==================== ABSTRACT ==================== -->
+      <div class="abstract-section">
+        <div class="abstract-block">
+          <h2 class="abstract-title">Abstract</h2>
+          <p class="abstract-text">Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like
+            Claude, Gemini, etc. to perform cell segmentation through natural language commands. This tool exposes
+            comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing,
+            image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates
+            seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
+            Researchers can execute sophisticated analysis pipelines by describing their goals in plain English,
+            eliminating the need to write complex code or manually tweak Cellpose controls. By combining the generalist
+            power of Cellpose with AI assistants, this standardizes protocols and accelerates microscopy image analysis,
+            aiding both research and education.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <div class="main-content">
+
+    <!-- ==================== COLUMN 1 ==================== -->
+    <div class="column">
+      <!-- Section 1: Cellpose -->
+      <div class="block block-accent-green">
+        <h2 class="block-title">Cellpose</h2>
+        <div class="block-content">
+          <p>Cellpose is a generalist deep learning algorithm for cellular segmentation from microscopy images. It
+            segments cell bodies, membranes, and nuclei across diverse microscopy techniques without requiring
+            specialized models or parameter tuning. Trained on 70,000+ segmented objects from 608 diverse images,
+            Cellpose provides multiple pretrained models, image restoration capabilities, and custom training support
+            <span class="ref">[1]</span>.</p>
+
+          <img src="poster_images/cellpose_gui.jpg" class="block-image" alt="Cellpose GUI">
+          <p class="caption">Cellpose GUI showing fluorescence microscopy segmentation with flow field overlays</p>
+        </div>
+      </div>
+
+      <!-- Section 2: MCP -->
+      <div class="block block-accent-teal">
+        <h2 class="block-title">MCP (Model Context Protocol) </h2>
+        <div class="block-content">
+          <p><b>The Problem</b></p>
+          <p>AI assistants like ChatGPT or Claude excel at text generation but cannot directly interact with software
+            applications. For scientific researchers, this means AI cannot access standard analysis tools or proprietary
+            data formats.</p>
+
+          <p><b>The Solution: MCP as a Universal Adapter</b></p>
+          <p>The Model Context Protocol (MCP) is an open-source standard developed by Anthropic that acts as a
+            "universal remote" for AI. Instead of building custom connections for each tool, MCP provides one
+            standardized communication language.</p>
+
+          <p><b>How It Works</b></p>
+          <div
+            style="background: #1a1a1a; padding: 15pt; border-radius: 8pt; margin: 10pt 0; font-size: 18pt; line-height: 1.6; color: #87CEEB;">
+            User Request → AI Assistant (Host App) → MCP Client → Transport Layer (JSON-RPC 2.0)
+            → MCP Server → Tool Execution→ Results
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== COLUMN 2 ==================== -->
+    <div class="column">
+      <!-- Section 3: Cellpose-MCP -->
+      <div class="block block-accent-orange">
+        <h2 class="block-title">Cellpose-MCP</h2>
+        <div class="block-content">
+          <p>Cellpose-mcp is an MCP server that enables AI assistants to perform Cellpose segmentation, image
+            restoration, and model training through natural language commands. Researchers can execute sophisticated
+            workflows using plain English, automate batch processing, and integrate with visualization tools for
+            immediate feedback.</p>
+
+          <div class="key-finding">
+            <p>No Coding needed &mdash; Describe your analysis in plain English</p>
+          </div>
+
+          <div class="arch-flow">
+            <div class="arch-box">AI App</div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-box mcp">MCP</div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-box">FastMCP<br>Server</div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-box tool">Cellpose</div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-box result">Results</div>
+          </div>
+
+          <p><b>Capabilities:</b> cellpose-mcp exposes comprehensive Cellpose functionality through 13+ MCP tools:</p>
+          <p><b>Segmentation:</b> <span class="tool-name">segment_cells_2d</span> (2D images, multiple models), <span
+              class="tool-name">segment_cells_3d</span> (3D volumes), <span class="tool-name">segment_cells_batch</span>
+            (parallel batch processing)</p>
+          <p><b>Image Restoration:</b> <span class="tool-name">denoise_image</span>, <span
+              class="tool-name">deblur_image</span>, <span class="tool-name">upsample_image</span>, <span
+              class="tool-name">restore_and_segment</span> (combined pipeline)</p>
+          <p><b>Training:</b> <span class="tool-name">train_segmentation_model</span>, <span
+              class="tool-name">train_restoration_model</span> (custom model training)</p>
+          <p><b>Utilities:</b> <span class="tool-name">list_available_models</span>, <span
+              class="tool-name">estimate_cell_diameter</span>, <span class="tool-name">save_masks</span>, <span
+              class="tool-name">load_image_info</span></p>
+        </div>
+      </div>
+
+      <!-- Section 4: Example Workflow -->
+      <div class="block block-accent-pink">
+        <h2 class="block-title">Example</h2>
+        <div class="block-content">
+          <p><b>User Prompt:</b> "Segment the cells in image.tif and show the results in napari"</p>
+          <p><b>Input Image:</b> image.tif - Fluorescence microscopy image with green-stained cytoplasm and blue-stained
+            nuclei</p>
+
+          <div style="display: flex; gap: 20pt; margin: 20pt 0;">
+            <div style="flex: 1;">
+              <img src="poster_images/img00.png" class="block-image" alt="Original Experimental Image" style="width: 100%;">
+            </div>
+            <div style="flex: 1;">
+              <img src="poster_images/img00_annotated_overlay.png" class="block-image" alt="Segmentation Output" style="width: 100%;">
+            </div>
+          </div>
+          <p class="caption" style="text-align: center; margin-top: 2pt;">Complete AI-driven workflow: Original
+            fluorescence image (left) and segmented cells with annotations (right)</p>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== COLUMN 3 ==================== -->
+    <div class="column">
+      <!-- Section 5: napari-mcp Integration -->
+      <div class="block block-accent-purple">
+        <h2 class="block-title">Integration with napari</h2>
+        <div class="block-content">
+          <p>Seamless integration with <b>napari-mcp <span class="ref">[2]</span></b> enables AI-driven visualization of
+            segmentation results in the <b>napari <span class="ref">[3]</span></b> viewer.</p>
+
+          <img src="poster_images/napari_gui.png" class="block-image" alt="napari 3D Viewer">
+          <p class="caption">napari viewer displaying 3D multi-channel microscopy data with nuclei and membrane layers
+          </p>
+
+          <div class="workflow-step">
+            <div class="step-num">1</div>
+            <div class="step-text">User describes analysis in natural language</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">2</div>
+            <div class="step-text">AI calls <span class="code">cellpose-mcp</span> to segment cells</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">3</div>
+            <div class="step-text">AI calls <span class="code">napari-mcp</span> to load & visualize results</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">4</div>
+            <div class="step-text">Interactive exploration in <b>napari GUI</b></div>
+          </div>
+
+          <div class="key-finding">
+            <p>No manual file handling &mdash; immediate visual feedback &mdash; iterative
+              refinement</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 6: Advantages -->
+      <div class="block block-accent-yellow">
+        <h2 class="block-title">Advantages</h2>
+        <div class="block-content">
+          <ul class="adv-list">
+            <li><b>AI Assisted:</b> Natural language interface enables biologists
+              without coding experience to perform sophisticated analyses</li>
+            <li><b>Seamless Integration:</b> The AI agent sees what you are seeing and can help you with the analysis</li>
+            <li><b>Rapid Prototyping:</b> Prototype workflows conversationally without
+              context-switching between tools</li>
+            <li><b>Private and Secure:</b> Your data is not sent to the server and stays on your local machine</li>
+            <li><b>Intelligent Automation:</b> AI suggests optimal parameters and generates
+              batch processing scripts</li>
+            <li><b>Workflow Automation:</b> From raw images to quantitative analysis can be done in a one place and the AI agent has context of the entire workflow</li>
+            <li><b>Extensible:</b> New analysis tools can be added as MCP servers
+              without changing user workflows, enabling incremental upgrades of scientific pipelines</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== COLUMN 4 ==================== -->
+    <div class="column">
+      <!-- Section 7: Conclusions -->
+      <div class="block block-accent-indigo">
+        <h2 class="block-title">Conclusions</h2>
+        <div class="block-content">
+          <p>Cellpose-mcp can transform scientific software from tools
+            requiring technical expertise into conversational partners that amplify researcher capabilities. By
+            combining the generalist power of Cellpose with the natural language interface of modern AI assistants, we
+            make sophisticated cell segmentation accessible to a broader scientific community. The integration with
+            napari-mcp <span class="ref">[2]</span> enables complete workflows from segmentation to interactive
+            visualization, reducing barriers to entry while maintaining the full power of advanced image analysis tools.
+            </p>
+
+          <img src="poster_images/mcp_conclusion.svg" class="block-image" alt="MCP-driven conclusions diagram">
+
+          <div class="key-finding">
+            <p>MCP enables AI-driven tool control for scientific computing</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistics Box -->
+      <div class="block block-accent-cyan">
+        <h2 class="block-title">Features</h2>
+        <div class="block-content">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-number">13+</span>
+              <span class="stat-label">MCP Tools</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">19</span>
+              <span class="stat-label">Pretrained Models</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">3+</span>
+              <span class="stat-label">File Formats<br><span style="font-size:14pt;">TIFF, PNG, NPY</span></span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" style="font-size:26pt;">Async</span>
+              <span class="stat-label">Thread‑safe, non‑blocking<br><span style="font-size:14pt;">FastMCP backend</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 8: Future Development -->
+      <div class="block block-accent-red">
+        <h2 class="block-title">Future Development</h2>
+        <div class="block-content">
+          <ul>
+            <li>Support for Claude desktop and Cellpose GUI Integration </li>
+            <li>Package distribution via PyPI and Conda-forge</li>
+            <li>Testing and Validation across different microscopy techniques and image modalities</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Scale poster to fit viewport while maintaining 4:3 aspect ratio
+    (function () {
+      function scalePoster() {
+        try {
+          const body = document.body;
+          const posterWidthPt = 3456;  // 4:3 ratio width
+          const posterHeightPt = 2592;  // 4:3 ratio height
+          const posterWidthPx = posterWidthPt * 1.333; // Convert pt to px
+          const posterHeightPx = posterHeightPt * 1.333;
+
+          const viewportWidth = window.innerWidth || 1920;
+          const viewportHeight = window.innerHeight || 1080;
+
+          // Calculate scale based on both width and height, maintaining 4:3 ratio
+          const scaleX = (viewportWidth * 0.95) / posterWidthPx;
+          const scaleY = (viewportHeight * 0.95) / posterHeightPx;
+          const scale = Math.min(scaleX, scaleY, 1.0); // Don't scale up, only down
+
+          body.style.transform = 'scale(' + scale + ')';
+          body.style.transformOrigin = 'top left';
+
+          // Adjust margin to account for scaled size
+          const scaledHeight = posterHeightPx * scale;
+          const originalHeight = posterHeightPx;
+          body.style.marginBottom = Math.max(0, (scaledHeight - originalHeight)) + 'px';
+        } catch (e) {
+          console.error('Scaling error:', e);
+        }
+      }
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(scalePoster, 100);
+      } else {
+        window.addEventListener('load', function () {
+          setTimeout(scalePoster, 100);
+        });
+      }
+
+      // Re-scale on window resize to maintain aspect ratio
+      window.addEventListener('resize', function () {
+        setTimeout(scalePoster, 100);
+      });
+    })();
+  </script>
+
+  <!-- ==================== FOOTER ==================== -->
+  <div class="footer">
+    <div class="references">
+      <b>References</b><br>
+      <span class="ref">[1]</span> Stringer, C., Wang, T., Michaelos, M. &amp; Pachitariu, M. Cellpose: a generalist algorithm for cellular
+      segmentation. <i>Nat Methods</i> <b>18</b>, 100&ndash;106 (2021). https://doi.org/10.1038/s41592-020-01018-x<br>
+      <span class="ref">[2]</span> napari-mcp: royerlab/napari-mcp. GitHub repository: https://github.com/royerlab/napari-mcp<br>
+      <span class="ref">[3]</span> napari contributors. napari: a multi-dimensional image viewer for python. Zenodo (2019).
+      https://doi.org/10.5281/zenodo.3555620<br>
+      <span class="ref">[5]</span> Model Context Protocol: https://modelcontextprotocol.io/<br>
+    </div>
+    <div class="acknowledgements">
+      <b>Funding Acknowledgements</b><br>
+      NSF-CREST: Center for Cellular and Biomolecular Machines at UC Merced (NSF-HRD-1547848 and NSF-EES-2112675). We acknowledge support from NSF-STC: Center for Engineering MechanoBiology (CMMI-2112675), This research was
+      conducted using Pinnacles (NSF MRI, #2019144) at the Cyberinfrastructure and Research Technologies (CIRT) at
+      University of California, Merced.
+    </div>
+    <div class="footer-qr">
+      <div class="badges">
+        <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+" class="badge">
+        <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg" alt="License: BSD-3-Clause"
+          class="badge" style="position: absolute; left: 4204px; top: 41px;">
+      </div>
+      <img src="poster_images/univerisity logo.svg" class="university-logo" alt="University Logo">
+    </div>
+  </div>
+
+</body>
+
+</html>
