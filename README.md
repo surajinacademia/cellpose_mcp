@@ -151,7 +151,8 @@ Key features:
 - **Napari Integration**: Integration with Napari for visualization and analysis
 
 
-**Author:** Suraj Sahu
+**Author:** [Suraj Sahu](https://physics.ucmerced.edu/content/suraj-sahu)  
+**Affiliation:** Department of Physics, University of California Merced, CA, USA  
 **Email:** ssahu2@ucmerced.edu
 
 
