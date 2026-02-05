@@ -27,12 +27,20 @@ pip install -e .
 
 ### Auto-Configure Your AI Application
 
-```bash
-# For Cursor IDE
-cellpose-mcp-install cursor
+| Application | Installation Command | Notes |
+| ----------- | -------------------- | ----- |
+| **Cursor IDE** | `cellpose-mcp-install cursor` | Auto-configures MCP settings |
+| **Claude Desktop** | `cellpose-mcp-install claude-desktop` | Adds to Claude Desktop config |
+| **Antigravity** | `cellpose-mcp-install antigravity` | Configures Antigravity MCP |
+| **Claude Code** | `cellpose-mcp-install claude-code` | Or manually add `.mcp.json` to project root |
+| **VS Code** | `cellpose-mcp-install vscode` | Configures Cline/Roo Cline extension |
 
-# For Claude Code - add a .mcp.json file to your project root:
-cat > .mcp.json << 'EOF'
+<details>
+<summary>Manual Configuration for Claude Code</summary>
+
+If you prefer manual setup, create a `.mcp.json` file in your project root:
+
+```json
 {
   "mcpServers": {
     "cellpose": {
@@ -45,13 +53,10 @@ cat > .mcp.json << 'EOF'
     }
   }
 }
-EOF
-
-# For other applications (Claude Desktop, Cline, etc.)
-cellpose-mcp-install --help # See all options
 ```
+</details>
 
-Restart your AI app and you're ready! Try asking:
+After installation, restart your AI app and try asking:
 
 ```text
 "Can you list available Cellpose models?"
@@ -59,6 +64,21 @@ Restart your AI app and you're ready! Try asking:
 ```
 
 ## 🎯 What Can You Do?
+
+### Example: Cell Segmentation in Action
+
+<table>
+<tr>
+<td width="50%">
+<img src="poster/poster_images/img00.png" alt="Original fluorescence microscopy image" />
+<p align="center"><em>Original Image: Fluorescence microscopy with green-stained cytoplasm and blue-stained nuclei</em></p>
+</td>
+<td width="50%">
+<img src="poster/poster_images/img00_annotated_overlay.png" alt="Segmented cells with annotations" />
+<p align="center"><em>Segmented Result: Cells automatically detected with boundaries and labels</em></p>
+</td>
+</tr>
+</table>
 
 ### Basic Cell Segmentation
 
@@ -110,15 +130,6 @@ The server exposes 13+ tools for complete Cellpose functionality:
 - **`estimate_cell_diameter`** - Estimate cell diameter from image
 - **`save_masks`** - Save masks in various formats
 - **`load_image_info`** - Get image metadata
-
-## 🤖 Supported AI Applications
-
-| Application | Command | Status |
-| ----------- | ------- | ------ |
-| **Cursor IDE** | `cellpose-mcp-install cursor` | ✅ Full Support |
-| **Claude Desktop** | `cellpose-mcp-install claude-desktop` | ✅ Full Support |
-| **Antigravity** | `cellpose-mcp-install antigravity` | ✅ Full Support |
-| **Claude Code** | `cellpose-mcp-install claude-code` | ✅ Full Support |
 
 ## 📖 Documentation
 
