@@ -1,6 +1,5 @@
 # Cellpose MCP Server
 
-[![Tests](https://github.com/surajinacademia/cellpose_mcp/workflows/Tests/badge.svg)](https://github.com/surajinacademia/cellpose_mcp/actions)
 [![codecov](https://codecov.io/gh/surajinacademia/cellpose_mcp/graph/badge.svg?token=PLACEHOLDER)](https://codecov.io/gh/surajinacademia/cellpose_mcp)
 [![PyPI version](https://badge.fury.io/py/cellpose-mcp.svg)](https://badge.fury.io/py/cellpose-mcp)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
