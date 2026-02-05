@@ -151,6 +151,10 @@ Key features:
 - **Napari Integration**: Integration with Napari for visualization and analysis
 
 
+**Author:** Suraj Sahu
+**Email:** ssahu2@ucmerced.edu
+
+
 ## 📄 License
 
 BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
