@@ -78,10 +78,4 @@ claude_desktop_config.json
 
 # written by setuptools_scm
 **/_version.py
-
-# Cellpose-specific
-demo_images/
-*_masks.png
-*_masks.tif
-*_masks_formatted.png
-*_segmented.png
+ 
