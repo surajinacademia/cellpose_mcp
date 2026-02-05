@@ -116,8 +116,9 @@ The server exposes 13+ tools for complete Cellpose functionality:
 | Application | Command | Status |
 | ----------- | ------- | ------ |
 | **Cursor IDE** | `cellpose-mcp-install cursor` | ✅ Full Support |
-| **Claude Desktop** | `cellpose-mcp-install claude-desktop` | 🚧 Coming Soon |
-
+| **Claude Desktop** | `cellpose-mcp-install claude-desktop` | ✅ Full Support |
+| **Antigravity** | `cellpose-mcp-install antigravity` | ✅ Full Support |
+| **Claude Code** | `cellpose-mcp-install claude-code` | ✅ Full Support |
 
 ## 📖 Documentation
 
@@ -136,8 +137,7 @@ Key features:
 
 - **Thread-safe**: All operations are properly serialized
 - **Non-blocking**: Async operations for better performance
-- **Extensible**: Easy to add new tools and functionality
-- **Open source**: Free to fork, modify, and experiment with
+- **Napari Integration**: Integration with Napari for visualization and analysis
 
 
 ## 📄 License
