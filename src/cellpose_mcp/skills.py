@@ -250,10 +250,11 @@ class VerificationReport:
                 )
 
             # Check for suspicious patterns
-            if checks["cell_size_std"] / checks["average_cell_size"] > 2.0:
-                validation["warnings"].append(
-                    "High cell size variability detected - may indicate segmentation issues"
-                )
+            if checks["average_cell_size"] > 0:
+                if checks["cell_size_std"] / checks["average_cell_size"] > 2.0:
+                    validation["warnings"].append(
+                        "High cell size variability detected - may indicate segmentation issues"
+                    )
 
             if n_cells == 0:
                 validation["pass"] = False

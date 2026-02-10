@@ -127,10 +127,15 @@ class TestVerificationReport:
     """Tests for VerificationReport class."""
 
     def test_verify_segmentation_mock_no_deps(self, temp_dir, monkeypatch):
-        """Test verification without actual image files."""
-        # This is a smoke test without dependencies
-        # Full integration tests would require actual image files
-        pass
+        """Test verification without actual image files.
+        
+        Note: Full integration tests with actual cellpose would require
+        the cellpose package and test images. This is a placeholder for
+        future integration tests.
+        """
+        # Placeholder for future integration test
+        # Would test VerificationReport.verify_segmentation with mock images
+        assert True  # Placeholder assertion
 
     def test_create_verification_report(self, temp_dir):
         """Test creating a verification report."""

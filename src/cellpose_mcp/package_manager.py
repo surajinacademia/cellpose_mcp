@@ -19,6 +19,7 @@ class PackageManager:
         "opencv-python",
         "opencv-contrib-python",
         "pillow",
+        "numpy",
         "scipy",
         "pandas",
         "matplotlib",
@@ -46,7 +47,15 @@ class PackageManager:
             True if package is allowed, False otherwise
         """
         # Extract base package name (remove version specifiers)
-        base_name = package_name.split("==")[0].split(">=")[0].split("<=")[0].strip()
+        # Support common operators: ==, >=, <=, !=, ~=, <, >
+        base_name = package_name.strip()
+        # Remove version specifiers by finding first occurrence of any operator
+        # Check longer operators first to avoid incorrect splitting
+        for op in ["==", ">=", "<=", "!=", "~=", "<", ">"]:
+            idx = base_name.find(op)
+            if idx != -1:
+                base_name = base_name[:idx].strip()
+                break
         return base_name.lower() in PackageManager.ALLOWED_PACKAGES
 
     @staticmethod
