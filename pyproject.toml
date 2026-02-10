@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cellpose-mcp"
-dynamic = ["version"]
+version = "0.1.1"
 description = "MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.10"

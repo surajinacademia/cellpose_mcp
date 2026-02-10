@@ -6,7 +6,7 @@
 Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like Claude, Cursor IDE, etc. to perform cell segmentation through natural language commands. This tool exposes comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing, image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
 
 
-![Cellpose-MCP Research Poster](poster/cellpose_mcp_poster.png)
+![Cellpose-MCP Research Poster](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/cellpose_mcp_poster.png)
 
 
 > **📌 Note**: This project started as a fun project inspired by [napari-mcp](https://github.com/royerlab/napari-mcp) and adapted for [Cellpose](https://github.com/MouseLand/cellpose) segmentation workflows. If you would like to contribute then please get in touch with me at [ssahu2@ucmerced.edu](mailto:ssahu2@ucmerced.edu).
@@ -70,11 +70,11 @@ After installation, restart your AI app and try asking:
 <table>
 <tr>
 <td width="50%">
-<img src="poster/poster_images/img00.png" alt="Original fluorescence microscopy image" />
+<img src="https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00.png" alt="Original fluorescence microscopy image" />
 <p align="center"><em>Original Image: Fluorescence microscopy with green-stained cytoplasm and blue-stained nuclei</em></p>
 </td>
 <td width="50%">
-<img src="poster/poster_images/img00_annotated_overlay.png" alt="Segmented cells with annotations" />
+<img src="https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00_annotated_overlay.png" alt="Segmented cells with annotations" />
 <p align="center"><em>Segmented Result: Cells automatically detected with boundaries and labels</em></p>
 </td>
 </tr>
