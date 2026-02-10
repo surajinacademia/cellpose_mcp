@@ -169,4 +169,9 @@ BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
 - [Anthropic](https://www.anthropic.com/) for Claude and MCP development
 - [Model Context Protocol](https://modelcontextprotocol.io/) - Open standard for AI-tool integration
 
+
+## 🤝 Contributing
+
+We welcome contributions to Cellpose MCP! If you would like to contribute or add features to this project, please reach out to [Suraj Sahu](mailto:ssahu2@ucmerced.edu). Whether you have ideas for new features, improvements, or bug fixes, your input is valuable.
+
 ---
