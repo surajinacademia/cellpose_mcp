@@ -98,4 +98,40 @@ This project was inspired by [napari-mcp](https://github.com/royerlab/napari-mcp
 
 ---
 
+## [0.1.3] - 2026-02-10
+
+### Fixed
+
+- Documentation links on PyPI now use full GitHub URLs so "Release Notes" and "Changelog" work correctly on the [PyPI project page](https://pypi.org/project/cellpose-mcp/).
+
+### Changed
+
+- README: Release Notes and Changelog links point to GitHub (e.g. `https://github.com/surajinacademia/cellpose_mcp/blob/main/CHANGELOG.md`).
+
+---
+
+## [0.1.2] - 2026-02-10
+
+### Changed
+
+- **License**: Added Cellpose/HHMI copyright acknowledgment to LICENSE for BSD-3-Clause compliance.
+- LICENSE wording updated to use plural "copyright holders" / "their" where appropriate.
+
+---
+
+## [0.1.1] - 2026-02-10
+
+### Fixed
+
+- Images in README now display correctly on PyPI by using GitHub raw content URLs for poster and demo images.
+
+### Added
+
+- PyPI badge in README linking to [pypi.org/project/cellpose-mcp/](https://pypi.org/project/cellpose-mcp/).
+
+---
+
 [0.1.0]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.0
+[0.1.1]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.1
+[0.1.2]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.2
+[0.1.3]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.3
