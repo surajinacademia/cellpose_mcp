@@ -2,6 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![PyPI](https://img.shields.io/pypi/v/cellpose-mcp.svg)](https://pypi.org/project/cellpose-mcp/)
 
 Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like Claude, Cursor IDE, etc. to perform cell segmentation through natural language commands. This tool exposes comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing, image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
 
