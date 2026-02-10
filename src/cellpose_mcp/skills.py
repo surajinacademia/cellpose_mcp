@@ -1,0 +1,340 @@
+"""Skills module for pipeline documentation, verification, and memory management."""
+
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+# Fix OpenMP threading conflicts
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+
+class PipelineMemory:
+    """Manages memory/logs for image analysis pipelines."""
+
+    def __init__(self, memory_dir: str = "./pipeline_memory"):
+        """Initialize pipeline memory manager.
+
+        Args:
+            memory_dir: Directory to store memory files
+        """
+        self.memory_dir = Path(memory_dir)
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_memory(
+        self,
+        pipeline_id: str,
+        data: dict[str, Any],
+        append: bool = False,
+    ) -> str:
+        """Save pipeline memory to disk.
+
+        Args:
+            pipeline_id: Unique identifier for the pipeline
+            data: Dictionary containing memory data
+            append: Whether to append to existing memory or overwrite
+
+        Returns:
+            Path to saved memory file
+        """
+        memory_file = self.memory_dir / f"{pipeline_id}_memory.json"
+
+        if append and memory_file.exists():
+            with open(memory_file, "r") as f:
+                existing_data = json.load(f)
+            existing_data["history"] = existing_data.get("history", [])
+            existing_data["history"].append(
+                {"timestamp": datetime.now().isoformat(), "data": data}
+            )
+            data_to_save = existing_data
+        else:
+            data_to_save = {
+                "pipeline_id": pipeline_id,
+                "created_at": datetime.now().isoformat(),
+                "data": data,
+                "history": [],
+            }
+
+        with open(memory_file, "w") as f:
+            json.dump(data_to_save, f, indent=2, default=str)
+
+        return str(memory_file)
+
+    def load_memory(self, pipeline_id: str) -> dict[str, Any] | None:
+        """Load pipeline memory from disk.
+
+        Args:
+            pipeline_id: Unique identifier for the pipeline
+
+        Returns:
+            Memory data dictionary or None if not found
+        """
+        memory_file = self.memory_dir / f"{pipeline_id}_memory.json"
+        if not memory_file.exists():
+            return None
+
+        with open(memory_file, "r") as f:
+            return json.load(f)
+
+    def list_memories(self) -> list[dict[str, str]]:
+        """List all saved pipeline memories.
+
+        Returns:
+            List of dictionaries with pipeline_id and file paths
+        """
+        memories = []
+        for memory_file in self.memory_dir.glob("*_memory.json"):
+            pipeline_id = memory_file.stem.replace("_memory", "")
+            memories.append(
+                {"pipeline_id": pipeline_id, "file_path": str(memory_file)}
+            )
+        return memories
+
+
+class PipelineSummary:
+    """Generates detailed summary documents for image analysis pipelines."""
+
+    @staticmethod
+    def create_summary(
+        pipeline_steps: list[dict[str, Any]],
+        results: dict[str, Any],
+        output_path: str | None = None,
+    ) -> str:
+        """Create a detailed pipeline summary document.
+
+        Args:
+            pipeline_steps: List of pipeline steps with parameters
+            results: Final results from the pipeline
+            output_path: Optional path to save summary (default: ./pipeline_summary.md)
+
+        Returns:
+            Markdown-formatted summary document
+        """
+        if output_path is None:
+            output_path = "./pipeline_summary.md"
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        summary = f"""# Image Analysis Pipeline Summary
+
+**Generated:** {timestamp}
+
+## Pipeline Overview
+
+**Total Steps:** {len(pipeline_steps)}
+**Status:** {results.get('status', 'Unknown')}
+
+## Pipeline Steps
+
+"""
+
+        for i, step in enumerate(pipeline_steps, 1):
+            summary += f"### Step {i}: {step.get('operation', 'Unknown')}\n\n"
+            summary += f"**Tool:** `{step.get('tool', 'N/A')}`\n\n"
+
+            if "parameters" in step:
+                summary += "**Parameters:**\n\n"
+                for param, value in step["parameters"].items():
+                    summary += f"- `{param}`: {value}\n"
+                summary += "\n"
+
+            if "output" in step:
+                summary += f"**Output:** {step['output']}\n\n"
+
+            if "metrics" in step:
+                summary += "**Metrics:**\n\n"
+                for metric, value in step["metrics"].items():
+                    summary += f"- {metric}: {value}\n"
+                summary += "\n"
+
+        summary += "## Final Results\n\n"
+
+        for key, value in results.items():
+            summary += f"**{key.replace('_', ' ').title()}:** {value}\n\n"
+
+        summary += """---
+
+*This summary was automatically generated by Cellpose MCP Skills module*
+"""
+
+        # Save to file
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(summary)
+
+        return summary
+
+
+class VerificationReport:
+    """Handles verification and validation of segmentation results."""
+
+    @staticmethod
+    def verify_segmentation(
+        mask_path: str,
+        original_image_path: str,
+        expected_cell_count: int | None = None,
+        min_cell_size: int = 10,
+        max_cell_size: int | None = None,
+    ) -> dict[str, Any]:
+        """Verify segmentation results against criteria.
+
+        Args:
+            mask_path: Path to segmentation mask file
+            original_image_path: Path to original image
+            expected_cell_count: Expected number of cells (optional)
+            min_cell_size: Minimum cell size in pixels
+            max_cell_size: Maximum cell size in pixels (optional)
+
+        Returns:
+            Dictionary with verification results and metrics
+        """
+        try:
+            import numpy as np
+            from cellpose import io
+
+            # Load mask
+            masks = io.imread(mask_path)
+            if masks.ndim > 2:
+                masks = masks.squeeze()
+
+            # Load original image for reference
+            img = io.imread(original_image_path)
+
+            # Calculate metrics
+            unique_cells = np.unique(masks)
+            n_cells = len(unique_cells) - 1  # Exclude background
+
+            # Calculate cell sizes
+            cell_sizes = []
+            for cell_id in unique_cells:
+                if cell_id == 0:  # Skip background
+                    continue
+                cell_size = np.sum(masks == cell_id)
+                cell_sizes.append(cell_size)
+
+            # Verification checks
+            checks = {
+                "total_cells": n_cells,
+                "average_cell_size": float(np.mean(cell_sizes)) if cell_sizes else 0,
+                "median_cell_size": float(np.median(cell_sizes)) if cell_sizes else 0,
+                "min_cell_size_observed": int(np.min(cell_sizes)) if cell_sizes else 0,
+                "max_cell_size_observed": int(np.max(cell_sizes)) if cell_sizes else 0,
+                "cell_size_std": float(np.std(cell_sizes)) if cell_sizes else 0,
+            }
+
+            # Validation results
+            validation = {
+                "pass": True,
+                "warnings": [],
+                "errors": [],
+            }
+
+            # Check cell count
+            if expected_cell_count is not None:
+                if abs(n_cells - expected_cell_count) > expected_cell_count * 0.2:
+                    validation["warnings"].append(
+                        f"Cell count ({n_cells}) differs significantly from expected ({expected_cell_count})"
+                    )
+
+            # Check cell sizes
+            if checks["min_cell_size_observed"] < min_cell_size:
+                validation["warnings"].append(
+                    f"Found cells smaller than minimum size ({min_cell_size} pixels)"
+                )
+
+            if max_cell_size and checks["max_cell_size_observed"] > max_cell_size:
+                validation["warnings"].append(
+                    f"Found cells larger than maximum size ({max_cell_size} pixels)"
+                )
+
+            # Check for suspicious patterns
+            if checks["cell_size_std"] / checks["average_cell_size"] > 2.0:
+                validation["warnings"].append(
+                    "High cell size variability detected - may indicate segmentation issues"
+                )
+
+            if n_cells == 0:
+                validation["pass"] = False
+                validation["errors"].append("No cells detected in mask")
+
+            return {
+                "verified": validation["pass"],
+                "metrics": checks,
+                "validation": validation,
+                "mask_shape": list(masks.shape),
+                "image_shape": list(img.shape),
+            }
+
+        except Exception as e:
+            return {
+                "verified": False,
+                "error": str(e),
+                "metrics": {},
+                "validation": {
+                    "pass": False,
+                    "errors": [f"Verification failed: {str(e)}"],
+                },
+            }
+
+    @staticmethod
+    def create_verification_report(
+        verification_results: dict[str, Any], output_path: str | None = None
+    ) -> str:
+        """Create a formatted verification report.
+
+        Args:
+            verification_results: Results from verify_segmentation
+            output_path: Optional path to save report
+
+        Returns:
+            Formatted verification report
+        """
+        if output_path is None:
+            output_path = "./verification_report.md"
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        report = f"""# Segmentation Verification Report
+
+**Generated:** {timestamp}
+**Status:** {'✓ PASSED' if verification_results.get('verified', False) else '✗ FAILED'}
+
+## Metrics
+
+"""
+
+        metrics = verification_results.get("metrics", {})
+        for metric, value in metrics.items():
+            report += f"- **{metric.replace('_', ' ').title()}:** {value}\n"
+
+        report += "\n## Validation Results\n\n"
+
+        validation = verification_results.get("validation", {})
+        if validation.get("errors"):
+            report += "### Errors\n\n"
+            for error in validation["errors"]:
+                report += f"- ❌ {error}\n"
+            report += "\n"
+
+        if validation.get("warnings"):
+            report += "### Warnings\n\n"
+            for warning in validation["warnings"]:
+                report += f"- ⚠️ {warning}\n"
+            report += "\n"
+
+        if not validation.get("errors") and not validation.get("warnings"):
+            report += "✓ All validation checks passed\n\n"
+
+        report += """---
+
+*This report was automatically generated by Cellpose MCP Skills module*
+"""
+
+        # Save to file
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(report)
+
+        return report
