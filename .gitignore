@@ -35,7 +35,10 @@ coverage.xml
 bandit-report.json
 safety-report.json
 
-# IDEs and editors
+# IDEs and editors (keep locally, do not publish to GitHub)
+.cursor/
+.claude/
+.agent/
 .vscode/
 .idea/
 *.swp
