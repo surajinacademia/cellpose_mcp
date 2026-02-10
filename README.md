@@ -135,6 +135,8 @@ The server exposes 13+ tools for complete Cellpose functionality:
 
 - **[Quick Start Guide](#-quick-start)** - Get running in 3 steps
 - **[Available Tools](#-available-mcp-tools)** - Complete tool list
+- **[Release Notes](RELEASE_NOTES_v0.1.0.md)** - Detailed v0.1.0 release information
+- **[Changelog](CHANGELOG.md)** - Version history and changes
 
 
 ## 📋 Architecture
