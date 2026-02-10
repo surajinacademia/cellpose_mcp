@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-cellpose-mcp is a Python MCP (Model Context Protocol) server that exposes Cellpose cell segmentation capabilities to AI assistants (Claude Desktop, Cursor, Claude Code). It wraps Cellpose's segmentation, restoration, and training APIs as MCP tools.
+cellpose-mcp is a Python MCP (Model Context Protocol) server that exposes Cellpose cell segmentation capabilities to AI assistants (Claude Desktop, Cursor, Claude Code). It wraps Cellpose's segmentation, restoration, and training APIs as MCP tools, and provides additional capabilities for pipeline documentation, verification, CellProfiler integration, and dynamic package management.
 
 ## Common Commands
 
@@ -36,15 +36,18 @@ mypy src/cellpose_mcp --ignore-missing-imports
 ## Architecture
 
 ```
-AI App (Claude/Cursor) ──MCP Protocol──▶ FastMCP Server ──▶ Tools ──▶ Cellpose
+AI App (Claude/Cursor) ──MCP Protocol──▶ FastMCP Server ──▶ Tools ──▶ Cellpose/CellProfiler
 ```
 
-**Entry flow**: `__main__.py` → `server.py` (imports mcp + tools) → `mcp_instance.py` (FastMCP singleton) → `tools.py` (11 tool functions)
+**Entry flow**: `__main__.py` → `server.py` (imports mcp + tools) → `mcp_instance.py` (FastMCP singleton) → `tools.py` (12 tool functions) + `skills_tools.py` (5 tools) + `cellprofiler_tools.py` (4 tools) + `package_tools.py` (4 tools)
 
 **Key files**:
-- `src/cellpose_mcp/tools.py` — All 11 MCP tool implementations (segmentation, restoration, training, utilities). This is the main file for feature work.
-- `src/cellpose_mcp/mcp_instance.py` — Single shared FastMCP instance imported by tools and server.
-- `src/cellpose_mcp/cli/install.py` — Auto-installer that writes MCP config for Cursor/Claude Desktop.
+- `src/cellpose_mcp/tools.py` — Core 12 MCP tool implementations (segmentation, restoration, training, utilities)
+- `src/cellpose_mcp/skills_tools.py` — Pipeline documentation, verification, and memory management tools (5 tools)
+- `src/cellpose_mcp/cellprofiler_tools.py` — CellProfiler integration tools (4 tools)
+- `src/cellpose_mcp/package_tools.py` — Dynamic package installation tools (4 tools)
+- `src/cellpose_mcp/mcp_instance.py` — Single shared FastMCP instance imported by tools and server
+- `src/cellpose_mcp/cli/install.py` — Auto-installer that writes MCP config for Cursor/Claude Desktop
 
 **Tool registration pattern**: Functions in `tools.py` are decorated with `@mcp.tool()`, then the raw callable is re-extracted via `.fn` so tools can also be called directly in tests:
 ```python

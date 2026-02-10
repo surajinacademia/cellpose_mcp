@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like Claude, Cursor IDE, etc. to perform cell segmentation through natural language commands. This tool exposes comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing, image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
+Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like Claude, Cursor IDE, etc. to perform cell segmentation through natural language commands. This tool exposes comprehensive Cellpose functionality through 25+ MCP tools, including 2D/3D segmentation, batch processing, image restoration (denoising, deblurring, upsampling), custom model training, pipeline documentation, verification, CellProfiler integration, and dynamic package management. The system integrates seamlessly with Napari and CellProfiler, enabling complete workflows from segmentation to interactive visualization and advanced analysis.
 
 
 ![Cellpose-MCP Research Poster](poster/cellpose_mcp_poster.png)
@@ -102,9 +102,34 @@ After installation, restart your AI app and try asking:
 "Process all images in ./data/ with the cyto2 model and save results to ./output/"
 ```
 
+### 🆕 Pipeline Documentation & Verification
+
+```text
+"Create a pipeline summary for my segmentation workflow"
+"Verify the segmentation results in ./output/masks.tif against the original image"
+"Save the pipeline memory for experiment_001"
+"Load the analysis memory for experiment_001"
+```
+
+### 🆕 CellProfiler Integration
+
+```text
+"Run the CellProfiler pipeline ./analysis/pipeline.cppipe on images in ./data/"
+"Import Cellpose masks from ./output/ into CellProfiler format"
+"Check if CellProfiler is available"
+```
+
+### 🆕 Package Management
+
+```text
+"Install scikit-image package for additional image processing"
+"Check if opencv-python is installed"
+"List all allowed packages that can be installed"
+```
+
 ## 🛠 Available MCP Tools
 
-The server exposes 13+ tools for complete Cellpose functionality:
+The server exposes 25+ tools for complete Cellpose functionality and workflow management:
 
 ### Segmentation Tools
 
@@ -130,6 +155,28 @@ The server exposes 13+ tools for complete Cellpose functionality:
 - **`estimate_cell_diameter`** - Estimate cell diameter from image
 - **`save_masks`** - Save masks in various formats
 - **`load_image_info`** - Get image metadata
+
+### 🆕 Pipeline Skills & Documentation Tools
+
+- **`create_pipeline_summary`** - Generate detailed summary document for analysis pipeline
+- **`verify_segmentation_results`** - Verify and validate segmentation quality
+- **`save_analysis_memory`** - Save pipeline execution memory for reproducibility
+- **`load_analysis_memory`** - Load previously saved pipeline memory
+- **`list_analysis_memories`** - List all saved pipeline executions
+
+### 🆕 CellProfiler Integration Tools
+
+- **`run_cellprofiler_pipeline`** - Execute CellProfiler pipelines for advanced analysis
+- **`import_cellpose_to_cellprofiler`** - Import Cellpose masks to CellProfiler
+- **`export_cellprofiler_measurements`** - Export CellProfiler measurements
+- **`check_cellprofiler_available`** - Check CellProfiler installation status
+
+### 🆕 Package Management Tools
+
+- **`install_package`** - Install approved image processing packages
+- **`list_installed_packages`** - List all installed Python packages
+- **`check_package_installed`** - Check if a specific package is installed
+- **`list_allowed_packages`** - Show whitelist of installable packages
 
 ## 📖 Documentation
 
