@@ -181,7 +181,28 @@ The server exposes 25+ tools for complete Cellpose functionality and workflow ma
 ## 📖 Documentation
 
 - **[Quick Start Guide](#-quick-start)** - Get running in 3 steps
-- **[Available Tools](#-available-mcp-tools)** - Complete tool list
+- **[Available Tools](#-available-mcp-tools)** - Complete tool list (25+ tools)
+- **[Example Workflows](EXAMPLES.md)** - Detailed examples using new features
+- **[Developer Guide](CLAUDE.md)** - Architecture and contribution guide
+
+## 🎯 New Features Highlights
+
+### Pipeline Documentation & Verification
+- **Automatic Summary Generation**: Create detailed markdown reports of your analysis pipelines
+- **Quality Verification**: Automated checks on segmentation results with metrics
+- **Memory/Logging**: Save and reload pipeline configurations for reproducibility
+
+### CellProfiler Integration
+- **Bridge Tools**: Seamlessly connect Cellpose segmentation with CellProfiler measurements
+- **Pipeline Execution**: Run CellProfiler pipelines directly from AI assistants
+- **Measurement Export**: Extract and organize CellProfiler results
+
+### Dynamic Package Management
+- **On-Demand Installation**: Install approved image processing packages as needed
+- **Security First**: Whitelist-based approach ensures safe package installation
+- **18+ Approved Packages**: Including scikit-image, opencv-python, matplotlib, and more
+
+See [EXAMPLES.md](EXAMPLES.md) for complete workflow examples.
 
 
 ## 📋 Architecture
