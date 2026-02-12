@@ -14,11 +14,23 @@ Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants
 
 ### 🚀 Quick Start
 
+**Requirements:** Python 3.10 or later (use a virtual environment or conda).
+
+**Install from PyPI:**
+
 ```bash
 pip install cellpose-mcp
 ```
 
-**OR for development:**
+**Install and configure for Cursor in one go:**
+
+```bash
+pip install cellpose-mcp && cellpose-mcp-install cursor
+```
+
+The installer uses the Python that runs the command (or a conda env named `Cellpose_mcp` if present). Restart Cursor after configuring.
+
+**Development install (from source):**
 
 ```bash
 git clone https://github.com/surajinacademia/cellpose_mcp.git
@@ -28,18 +40,22 @@ pip install -e .
 
 ### Auto-Configure Your AI Application
 
-| Application | Installation Command | Notes |
-| ----------- | -------------------- | ----- |
-| **Cursor IDE** | `cellpose-mcp-install cursor` | Auto-configures MCP settings |
+After `pip install cellpose-mcp`, run the installer for your app. It writes to the correct MCP config file using your current Python.
+
+| Application | Command | Notes |
+| ----------- | ------- | ----- |
+| **Cursor IDE** | `cellpose-mcp-install cursor` | Writes to `~/.cursor/mcp.json` |
 | **Claude Desktop** | `cellpose-mcp-install claude-desktop` | Adds to Claude Desktop config |
 | **Antigravity** | `cellpose-mcp-install antigravity` | Configures Antigravity MCP |
-| **Claude Code** | `cellpose-mcp-install claude-code` | Or manually add `.mcp.json` to project root |
-| **VS Code** | `cellpose-mcp-install vscode` | Configures Cline/Roo Cline extension |
+| **VS Code (Cline/Roo Cline)** | `cellpose-mcp-install vscode` | Configures Cline/Roo Cline extension |
+| **Claude Code** | Manual only | See [Manual Configuration](#manual-configuration-for-claude-code) below |
+
+Options: `--python-path /path/to/python` to use a specific Python; `--env-name NAME` to use a conda env (default: `Cellpose_mcp`).
 
 <details>
 <summary>Manual Configuration for Claude Code</summary>
 
-If you prefer manual setup, create a `.mcp.json` file in your project root:
+If you prefer manual setup (or use Claude Code), create a `.mcp.json` file in your project root. Use the full path to your Python executable if `python` is not the one that has `cellpose-mcp` installed (e.g. a venv or conda):
 
 ```json
 {
@@ -55,6 +71,8 @@ If you prefer manual setup, create a `.mcp.json` file in your project root:
   }
 }
 ```
+
+For **Cursor**, use the same structure in `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in your project.
 </details>
 
 After installation, restart your AI app and try asking:

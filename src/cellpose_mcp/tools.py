@@ -10,7 +10,6 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 from pathlib import Path
 from typing import Any
 
-import imageio
 import numpy as np
 from cellpose import io, models
 from cellpose.denoise import CellposeDenoiseModel, DenoiseModel
@@ -469,9 +468,10 @@ def restore_and_segment(
             gpu=gpu, pretrained_model=restoration_model, model_type=segmentation_model
         )
 
-        # Run restoration + segmentation
+        # Run restoration + segmentation (diameter=None for auto-estimate)
+        diameter_param = None if diameter == 0 else diameter
         masks, flows, styles, diams, restored = model.eval(
-            img, diameter=diameter, channels=channels, restore=True
+            img, diameter=diameter_param, channels=channels, restore=True
         )
 
         # Determine output paths
@@ -650,44 +650,93 @@ def save_masks(
     mask_path: str,
     output_format: str = "tif",
     output_path: str | None = None,
-    save_outlines: bool = False,
+    image_path: str | None = None,
     save_flows: bool = False,
 ) -> dict[str, Any]:
-    """Save masks in various formats with optional outlines and flows.
+    """Save masks plus outlines and overlay visualizations.
+
+    Always writes three outputs: (1) masks in the chosen format,
+    (2) outlines as a binary PNG, (3) overlay PNG (colored masks on image or black).
 
     Args:
         mask_path: Path to existing mask file
-        output_format: Output format (tif, png, npy)
-        output_path: Optional custom output path
-        save_outlines: Whether to save cell outlines
-        save_flows: Whether to save flow fields
+        output_format: Output format for masks (tif, png, npy)
+        output_path: Optional custom output path for the masks file
+        image_path: Optional path to original image; if provided, overlay is drawn on it
+        save_flows: Reserved for future use (flow fields not saved)
 
     Returns:
-        Dictionary with output file paths
+        Dictionary with mask_path, outlines_path, overlay_path, and files_created
     """
     try:
+        from cellpose import plot, utils
+
         masks = io.imread(mask_path)
 
         mask_path_obj = Path(mask_path)
         if output_path is None:
             output_path = str(mask_path_obj.parent / f"{mask_path_obj.stem}_formatted.{output_format}")
 
+        base = output_path.replace(f".{output_format}", "")
+        outlines_path = f"{base}_outlines.png"
+        overlay_path = f"{base}_overlay.png"
+
         files_created = [output_path]
 
-        # Save masks
+        # 2D views for outlines and overlay (use first slice if 3D)
+        if masks.ndim > 2:
+            masks_2d = masks[0] if masks.shape[0] < masks.shape[-1] else masks[:, :, 0]
+        else:
+            masks_2d = masks
+
+        h, w = masks_2d.shape[:2]
+
+        # 1. Save masks
         io.imsave(output_path, masks)
 
-        # Save outlines if requested
-        if save_outlines:
-            from cellpose import utils
+        # 2. Save outlines (binary PNG of outline pixels)
+        outlines = utils.outlines_list(masks_2d)
+        out_img = np.zeros((h, w), dtype=np.uint8)
+        for o in outlines:
+            if o is None or len(o) == 0:
+                continue
+            rr = np.clip(o[:, 1].astype(np.int32), 0, h - 1)
+            cc = np.clip(o[:, 0].astype(np.int32), 0, w - 1)
+            out_img[rr, cc] = 255
+        io.imsave(outlines_path, out_img)
+        files_created.append(outlines_path)
 
-            outlines = utils.outlines_list(masks)
-            outlines_path = output_path.replace(f".{output_format}", "_outlines.png")
-            # Save outlines visualization
-            files_created.append(outlines_path)
+        # 3. Save overlay (colored mask on image or black)
+        if image_path is not None:
+            img = io.imread(image_path)
+            if img.ndim > 2:
+                img_2d = img[0] if img.shape[0] < img.shape[-1] else np.mean(img[:, :, : min(4, img.shape[-1])], axis=-1)
+            else:
+                img_2d = np.asarray(img, dtype=np.float32)
+            ih, iw = img_2d.shape[:2]
+            if (ih, iw) != (h, w):
+                canvas = np.zeros((h, w), dtype=np.float32)
+                ph, pw = min(h, ih), min(w, iw)
+                canvas[:ph, :pw] = img_2d[:ph, :pw]
+                img_2d = canvas
+            else:
+                img_2d = img_2d.astype(np.float32)
+        else:
+            img_2d = np.zeros((h, w), dtype=np.float32)
+        if np.issubdtype(img_2d.dtype, np.integer):
+            img_2d = img_2d.astype(np.float32) / max(float(np.max(img_2d)), 1.0)
+        overlay_rgb = plot.mask_overlay(img_2d, masks_2d)
+        if overlay_rgb.max() <= 1.0:
+            overlay_uint8 = (np.clip(overlay_rgb, 0, 1) * 255).astype(np.uint8)
+        else:
+            overlay_uint8 = np.clip(overlay_rgb, 0, 255).astype(np.uint8)
+        io.imsave(overlay_path, overlay_uint8)
+        files_created.append(overlay_path)
 
         return {
             "output_path": output_path,
+            "outlines_path": outlines_path,
+            "overlay_path": overlay_path,
             "files_created": files_created,
             "format": output_format,
         }

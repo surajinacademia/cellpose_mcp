@@ -60,6 +60,31 @@ def find_conda_env(env_name: str = "Cellpose_mcp") -> str | None:
     return None
 
 
+def resolve_python_path(
+    python_path: str | None = None,
+    env_name: str = "Cellpose_mcp",
+) -> str | None:
+    """Resolve the Python executable to use for running cellpose_mcp.
+
+    Precedence: explicit python_path > conda env named env_name > current interpreter.
+
+    Args:
+        python_path: Explicit path to Python (if provided, used as-is).
+        env_name: Conda environment name to try when python_path is None.
+
+    Returns:
+        Path to Python executable, or None only if explicit python_path was invalid.
+    """
+    if python_path is not None:
+        if os.path.isfile(python_path) or shutil.which(python_path):
+            return python_path
+        return None
+    conda_python = find_conda_env(env_name)
+    if conda_python is not None:
+        return conda_python
+    return sys.executable
+
+
 def get_cursor_config_path() -> Path | None:
     """Get the path to Cursor MCP configuration file.
 
@@ -259,26 +284,24 @@ def install_for_claude_desktop(python_path: str | None = None, env_name: str = "
     Returns:
         True if installation succeeded, False otherwise
     """
-    # Find Python path
-    if python_path is None:
-        python_path = find_conda_env(env_name)
-        if python_path is None:
-            print(f"❌ Could not find '{env_name}' conda environment.")
-            print(f"   Please activate it or provide the Python path manually.")
-            return False
+    # Resolve Python path (conda env, or current interpreter)
+    resolved = resolve_python_path(python_path, env_name)
+    if resolved is None:
+        print(f"❌ Invalid Python path: {python_path}")
+        return False
+    python_path = resolved
 
     # Verify Python can import cellpose_mcp
     try:
-        result = subprocess.run(
+        subprocess.run(
             [python_path, "-m", "cellpose_mcp", "--help"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        # Even if it fails, we'll still add it (might work after restart)
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        print(f"⚠️  Warning: Could not verify cellpose_mcp installation in {python_path}")
-        print(f"   Make sure cellpose-mcp is installed: pip install -e .")
+        print(f"⚠️  Warning: Could not verify cellpose_mcp in this Python.")
+        print(f"   Ensure cellpose-mcp is installed: pip install cellpose-mcp")
 
     # Get config path
     config_path = get_claude_desktop_config_path()
@@ -340,26 +363,24 @@ def install_for_cursor(python_path: str | None = None, env_name: str = "Cellpose
     Returns:
         True if installation succeeded, False otherwise
     """
-    # Find Python path
-    if python_path is None:
-        python_path = find_conda_env(env_name)
-        if python_path is None:
-            print(f"❌ Could not find '{env_name}' conda environment.")
-            print(f"   Please activate it or provide the Python path manually.")
-            return False
+    # Resolve Python path (conda env, or current interpreter)
+    resolved = resolve_python_path(python_path, env_name)
+    if resolved is None:
+        print(f"❌ Invalid Python path: {python_path}")
+        return False
+    python_path = resolved
 
     # Verify Python can import cellpose_mcp
     try:
-        result = subprocess.run(
+        subprocess.run(
             [python_path, "-m", "cellpose_mcp", "--help"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        # Even if it fails, we'll still add it (might work after restart)
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        print(f"⚠️  Warning: Could not verify cellpose_mcp installation in {python_path}")
-        print(f"   Make sure cellpose-mcp is installed: pip install -e .")
+        print(f"⚠️  Warning: Could not verify cellpose_mcp in this Python.")
+        print(f"   Ensure cellpose-mcp is installed: pip install cellpose-mcp")
 
     # Get config path
     config_path = get_cursor_config_path()
@@ -421,26 +442,24 @@ def install_for_antigravity(python_path: str | None = None, env_name: str = "Cel
     Returns:
         True if installation succeeded, False otherwise
     """
-    # Find Python path
-    if python_path is None:
-        python_path = find_conda_env(env_name)
-        if python_path is None:
-            print(f"❌ Could not find '{env_name}' conda environment.")
-            print(f"   Please activate it or provide the Python path manually.")
-            return False
+    # Resolve Python path (conda env, or current interpreter)
+    resolved = resolve_python_path(python_path, env_name)
+    if resolved is None:
+        print(f"❌ Invalid Python path: {python_path}")
+        return False
+    python_path = resolved
 
     # Verify Python can import cellpose_mcp
     try:
-        result = subprocess.run(
+        subprocess.run(
             [python_path, "-m", "cellpose_mcp", "--help"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        # Even if it fails, we'll still add it (might work after restart)
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        print(f"⚠️  Warning: Could not verify cellpose_mcp installation in {python_path}")
-        print(f"   Make sure cellpose-mcp is installed: pip install -e .")
+        print(f"⚠️  Warning: Could not verify cellpose_mcp in this Python.")
+        print(f"   Ensure cellpose-mcp is installed: pip install cellpose-mcp")
 
     # Get config path
     config_path = get_antigravity_config_path()
@@ -502,26 +521,24 @@ def install_for_vscode(python_path: str | None = None, env_name: str = "Cellpose
     Returns:
         True if installation succeeded, False otherwise
     """
-    # Find Python path
-    if python_path is None:
-        python_path = find_conda_env(env_name)
-        if python_path is None:
-            print(f"❌ Could not find '{env_name}' conda environment.")
-            print(f"   Please activate it or provide the Python path manually.")
-            return False
+    # Resolve Python path (conda env, or current interpreter)
+    resolved = resolve_python_path(python_path, env_name)
+    if resolved is None:
+        print(f"❌ Invalid Python path: {python_path}")
+        return False
+    python_path = resolved
 
     # Verify Python can import cellpose_mcp
     try:
-        result = subprocess.run(
+        subprocess.run(
             [python_path, "-m", "cellpose_mcp", "--help"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        # Even if it fails, we'll still add it (might work after restart)
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        print(f"⚠️  Warning: Could not verify cellpose_mcp installation in {python_path}")
-        print(f"   Make sure cellpose-mcp is installed: pip install -e .")
+        print(f"⚠️  Warning: Could not verify cellpose_mcp in this Python.")
+        print(f"   Ensure cellpose-mcp is installed: pip install cellpose-mcp")
 
     # Get config path
     config_path = get_vscode_config_path()
@@ -598,7 +615,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.app == "cursor":
+    if args.app in ["cursor", "cline-cursor"]:
         success = install_for_cursor(args.python_path, args.env_name)
         sys.exit(0 if success else 1)
     elif args.app == "claude-desktop":
