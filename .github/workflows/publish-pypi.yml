@@ -1,0 +1,45 @@
+# Publish source + wheel to PyPI when a release tag is pushed (e.g. v0.1.5).
+#
+# Setup (one-time on https://pypi.org ):
+#   1. Project → Settings → Publishing → "Add a new pending publisher"
+#   2. Provider: GitHub
+#   3. Repository owner + name: must match this repo (e.g. surajinacademia/cellpose_mcp)
+#   4. Workflow name: publish-pypi.yml  (this file)
+#   5. Environment name: leave blank unless you add `environment: pypi` below and create
+#      a matching GitHub Environment — then use the same name on PyPI.
+#   6. Save; PyPI will allow OIDC uploads from that workflow only.
+#
+# After that, tagging triggers this workflow; no long-lived API token in GitHub secrets.
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build
+        run: pip install --upgrade pip build
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
