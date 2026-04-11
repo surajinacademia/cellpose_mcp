@@ -17,6 +17,19 @@ from cellpose.denoise import CellposeDenoiseModel, DenoiseModel
 # Import the shared MCP instance
 from cellpose_mcp.mcp_instance import mcp
 
+
+def _unwrap_mcp_tool(wrapped: Any) -> Any:
+    """Return the plain Python callable behind an MCP tool wrapper.
+
+    FastMCP historically attached the original function as ``wrapped.fn``; some
+    versions register the bare function instead, which has no ``.fn`` attribute.
+    """
+    inner = getattr(wrapped, "fn", None)
+    if inner is not None:
+        return inner
+    return getattr(wrapped, "__wrapped__", wrapped)
+
+
 # Predefined model types
 PRETRAINED_MODELS = [
     "cyto",
@@ -70,7 +83,8 @@ def segment_cells_2d(
         invert: Invert image intensities (for bright background)
         output_path: Optional path to save masks (default: image_path with _masks suffix)
 
-    Returns:
+    Returns
+    -------
         Dictionary with segmentation results including cells_detected, output_path, diameter, mask_shape
     """
     try:
@@ -98,20 +112,18 @@ def segment_cells_2d(
             normalize=normalize,
             invert=invert,
         )
-        
+
         # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
         if isinstance(result, tuple):
             if len(result) == 3:
                 masks, flows, diams = result
-                styles = None
             elif len(result) == 4:
-                masks, flows, styles, diams = result
+                masks, flows, _, diams = result
             else:
                 raise ValueError(f"Unexpected number of return values: {len(result)}")
         else:
             masks = result
             flows = None
-            styles = None
             diams = None
 
         # Determine output path
@@ -164,7 +176,8 @@ def segment_cells_3d(
         gpu: Whether to use GPU acceleration
         output_path: Optional path to save masks
 
-    Returns:
+    Returns
+    -------
         Dictionary with 3D segmentation results
     """
     try:
@@ -192,14 +205,13 @@ def segment_cells_3d(
         # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
         if isinstance(result, tuple):
             if len(result) == 3:
-                masks, flows, diams = result
+                masks, _, diams = result
             elif len(result) == 4:
-                masks, flows, styles, diams = result
+                masks, _, _, diams = result
             else:
                 raise ValueError(f"Unexpected number of return values: {len(result)}")
         else:
             masks = result
-            flows = None
             diams = None
 
         # Determine output path
@@ -244,7 +256,8 @@ def segment_cells_batch(
         gpu: Whether to use GPU acceleration
         batch_size: Number of images to process in parallel
 
-    Returns:
+    Returns
+    -------
         Dictionary with batch processing results
     """
     try:
@@ -260,10 +273,7 @@ def segment_cells_batch(
                 result = model.eval(img, diameter=diameter_param, batch_size=batch_size)
 
                 # Handle Cellpose v4 API return values
-                if isinstance(result, tuple):
-                    masks = result[0]
-                else:
-                    masks = result
+                masks = result[0] if isinstance(result, tuple) else result
 
                 # Determine output path
                 img_path_obj = Path(img_path)
@@ -316,7 +326,8 @@ def denoise_image(
         gpu: Whether to use GPU acceleration
         output_path: Optional path to save denoised image
 
-    Returns:
+    Returns
+    -------
         Dictionary with denoising results
     """
     try:
@@ -365,7 +376,8 @@ def deblur_image(
         gpu: Whether to use GPU acceleration
         output_path: Optional path to save deblurred image
 
-    Returns:
+    Returns
+    -------
         Dictionary with deblurring results
     """
     try:
@@ -409,7 +421,8 @@ def upsample_image(
         gpu: Whether to use GPU acceleration
         output_path: Optional path to save upsampled image
 
-    Returns:
+    Returns
+    -------
         Dictionary with upsampling results
     """
     try:
@@ -457,7 +470,8 @@ def restore_and_segment(
         output_path_mask: Optional path to save masks
         output_path_restored: Optional path to save restored image
 
-    Returns:
+    Returns
+    -------
         Dictionary with combined restoration and segmentation results
     """
     try:
@@ -528,23 +542,54 @@ def train_segmentation_model(
         gpu: Whether to use GPU acceleration
         output_dir: Directory to save trained model (default: current directory)
 
-    Returns:
+    Returns
+    -------
         Dictionary with training results
     """
     try:
+        import tempfile
+
         from cellpose import train
 
-        # Load training data
-        train_data, train_labels, _ = io.load_train_test_data(
-            train_dir, train_labels_dir, image_filter="_img", mask_filter="_masks"
-        )
+        # Cellpose expects images and masks in the same directory (image_filter/_img,
+        # mask_filter/_masks). Build a combined dir when separate dirs are given.
+        def _combined_data_dir(images_dir: str, labels_dir: str) -> tuple[str, tempfile.TemporaryDirectory | None]:
+            img_names = {f for f in os.listdir(images_dir) if "_img" in f}
+            label_names = {f for f in os.listdir(labels_dir) if "_masks" in f}
+            if not img_names or not label_names:
+                return images_dir, None  # fallback: use images_dir only
+            # Build combined temp dir with symlinks so Cellpose finds both
+            tmp = tempfile.TemporaryDirectory(prefix="cellpose_train_")
+            for f in img_names:
+                os.symlink(os.path.join(images_dir, f), os.path.join(tmp.name, f))
+            for f in label_names:
+                os.symlink(os.path.join(labels_dir, f), os.path.join(tmp.name, f))
+            return tmp.name, tmp
+
+        train_combined, train_tmp = _combined_data_dir(train_dir, train_labels_dir)
+        try:
+            out = io.load_train_test_data(
+                train_combined, test_dir=None, image_filter="_img", mask_filter="_masks"
+            )
+        finally:
+            if train_tmp is not None:
+                train_tmp.cleanup()
+        train_data = out[0]
+        train_labels = out[1]
 
         test_data = None
         test_labels = None
         if test_dir and test_labels_dir:
-            test_data, test_labels, _ = io.load_train_test_data(
-                test_dir, test_labels_dir, image_filter="_img", mask_filter="_masks"
-            )
+            test_combined, test_tmp = _combined_data_dir(test_dir, test_labels_dir)
+            try:
+                out_test = io.load_train_test_data(
+                    test_combined, test_dir=None, image_filter="_img", mask_filter="_masks"
+                )
+                test_data = out_test[0]
+                test_labels = out_test[1]
+            finally:
+                if test_tmp is not None:
+                    test_tmp.cleanup()
 
         # Initialize model
         # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
@@ -556,14 +601,13 @@ def train_segmentation_model(
             output_dir = os.getcwd()
         os.makedirs(output_dir, exist_ok=True)
 
-        # Train model
+        # Train model (Cellpose v4 uses channel_axis, not channels)
         train.train_seg(
             model.net,
             train_data,
             train_labels,
             test_data=test_data,
             test_labels=test_labels,
-            channels=[0, 0],  # Default channels
             save_path=output_dir,
             n_epochs=n_epochs,
             learning_rate=learning_rate,
@@ -588,7 +632,8 @@ def train_segmentation_model(
 def list_available_models() -> dict[str, Any]:
     """List all available pretrained Cellpose models.
 
-    Returns:
+    Returns
+    -------
         Dictionary with lists of available models by category
     """
     return {
@@ -618,7 +663,8 @@ def estimate_cell_diameter(
         channels: Channel specification
         gpu: Whether to use GPU acceleration
 
-    Returns:
+    Returns
+    -------
         Dictionary with estimated diameter and confidence
     """
     try:
@@ -628,11 +674,8 @@ def estimate_cell_diameter(
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
         result = model.eval(img, channels=channels, diameter=None)
 
-        # Handle Cellpose v4 API return values
-        if isinstance(result, tuple):
-            diams = result[-1]  # diams is always the last value
-        else:
-            diams = None
+        # Handle Cellpose v4 API return values (diams is always the last tuple element)
+        diams = result[-1] if isinstance(result, tuple) else None
 
         diameter_est = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0]) if diams is not None else 0.0
 
@@ -665,7 +708,8 @@ def save_masks(
         image_path: Optional path to original image; if provided, overlay is drawn on it
         save_flows: Reserved for future use (flow fields not saved)
 
-    Returns:
+    Returns
+    -------
         Dictionary with mask_path, outlines_path, overlay_path, and files_created
     """
     try:
@@ -751,7 +795,8 @@ def load_image_info(image_path: str) -> dict[str, Any]:
     Args:
         image_path: Path to image file
 
-    Returns:
+    Returns
+    -------
         Dictionary with image metadata (shape, dtype, channels, dimensions)
     """
     try:
@@ -774,37 +819,37 @@ def load_image_info(image_path: str) -> dict[str, Any]:
 # Make all MCP tools directly callable by exposing their underlying functions
 # This allows tools to be called both as MCP tools (via protocol) and as Python functions (directly)
 _segment_cells_2d_tool = segment_cells_2d
-segment_cells_2d = segment_cells_2d.fn
+segment_cells_2d = _unwrap_mcp_tool(segment_cells_2d)
 
 _segment_cells_3d_tool = segment_cells_3d
-segment_cells_3d = segment_cells_3d.fn
+segment_cells_3d = _unwrap_mcp_tool(segment_cells_3d)
 
 _segment_cells_batch_tool = segment_cells_batch
-segment_cells_batch = segment_cells_batch.fn
+segment_cells_batch = _unwrap_mcp_tool(segment_cells_batch)
 
 _denoise_image_tool = denoise_image
-denoise_image = denoise_image.fn
+denoise_image = _unwrap_mcp_tool(denoise_image)
 
 _deblur_image_tool = deblur_image
-deblur_image = deblur_image.fn
+deblur_image = _unwrap_mcp_tool(deblur_image)
 
 _upsample_image_tool = upsample_image
-upsample_image = upsample_image.fn
+upsample_image = _unwrap_mcp_tool(upsample_image)
 
 _restore_and_segment_tool = restore_and_segment
-restore_and_segment = restore_and_segment.fn
+restore_and_segment = _unwrap_mcp_tool(restore_and_segment)
 
 _train_segmentation_model_tool = train_segmentation_model
-train_segmentation_model = train_segmentation_model.fn
+train_segmentation_model = _unwrap_mcp_tool(train_segmentation_model)
 
 _list_available_models_tool = list_available_models
-list_available_models = list_available_models.fn
+list_available_models = _unwrap_mcp_tool(list_available_models)
 
 _estimate_cell_diameter_tool = estimate_cell_diameter
-estimate_cell_diameter = estimate_cell_diameter.fn
+estimate_cell_diameter = _unwrap_mcp_tool(estimate_cell_diameter)
 
 _save_masks_tool = save_masks
-save_masks = save_masks.fn
+save_masks = _unwrap_mcp_tool(save_masks)
 
 _load_image_info_tool = load_image_info
-load_image_info = load_image_info.fn
+load_image_info = _unwrap_mcp_tool(load_image_info)

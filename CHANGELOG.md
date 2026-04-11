@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-04-11
+
+### Fixed
+
+- FastMCP compatibility when tool decorators do not expose ``.fn`` on the wrapped callable (import-time crash under `uv run` / recent FastMCP versions).
+- ``cellpose_mcp.server`` now re-exports ``mcp`` so ``import cellpose_mcp`` and the CLI entry point resolve the shared FastMCP instance.
+
+### Added
+
+- GitHub Actions workflow (Ruff + pytest on Python 3.10–3.12).
+- Smoke tests for package import, ``mcp`` singleton identity, and tool unwrapping.
+
+### Changed
+
+- Pinned ``fastmcp`` to ``>=2.10.3,<3`` until the project is tested on FastMCP 3.x.
+
 ## [0.1.0] - 2026-02-10
 
 ### 🎉 First Release
