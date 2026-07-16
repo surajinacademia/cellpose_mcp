@@ -1,0 +1,19 @@
+schema_version = 1
+target_release = "0.2.0"
+release_blockers = ["core_capability_matrix_unresolved"]
+required_core_tools = [
+  "get_capabilities",
+  "inspect_image",
+  "list_models",
+  "prepare_model",
+  "segment",
+  "refine_segmentation",
+  "measure_masks",
+  "evaluate_segmentation",
+  "export_segmentation",
+  "train_model",
+  "restore_image",
+  "get_job",
+  "cancel_job",
+]
+stable_features = []
