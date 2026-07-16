@@ -581,8 +581,10 @@ def _validated_archive_identity(
     return directory_identity(opened_info)
 
 
-def create_temporary_report(archive_descriptor: int) -> tuple[int, str]:
-    """Create one unique mode-0600 temporary report by archive descriptor."""
+def create_temporary_report(
+    archive_descriptor: int,
+) -> tuple[int, str, tuple[int, int]]:
+    """Create and identify one mode-0600 temporary report safely."""
     flags = (
         os.O_WRONLY
         | os.O_CREAT
@@ -601,8 +603,29 @@ def create_temporary_report(archive_descriptor: int) -> tuple[int, str]:
             )
         except FileExistsError:
             continue
-        os.fchmod(descriptor, 0o600)
-        return descriptor, name
+        identity: tuple[int, int] | None = None
+        setup_complete = False
+        try:
+            identity = entry_identity(os.fstat(descriptor))
+            os.fchmod(descriptor, 0o600)
+            setup_complete = True
+            return descriptor, name, identity
+        finally:
+            if not setup_complete:
+                try:
+                    os.close(descriptor)
+                finally:
+                    if identity is None:
+                        try:
+                            os.unlink(name, dir_fd=archive_descriptor)
+                        except FileNotFoundError:
+                            pass
+                    else:
+                        unlink_if_owned(
+                            archive_descriptor,
+                            name,
+                            identity,
+                        )
     raise FileExistsError("could not allocate a unique inventory temporary")
 
 
@@ -681,11 +704,12 @@ def write_new_atomic(path: Path, document: dict[str, object]) -> None:
             archive_descriptor,
         )
 
-        temporary_descriptor, temporary_name = create_temporary_report(
-            archive_descriptor
-        )
-        temporary_identity = entry_identity(
-            os.fstat(temporary_descriptor)
+        (
+            temporary_descriptor,
+            temporary_name,
+            temporary_identity,
+        ) = create_temporary_report(
+            archive_descriptor,
         )
         with os.fdopen(
             temporary_descriptor,
@@ -741,18 +765,55 @@ def write_new_atomic(path: Path, document: dict[str, object]) -> None:
             raise RuntimeError(
                 "local_archive changed during inventory write"
             )
-        final_info = os.stat(
-            destination.name,
-            dir_fd=archive_descriptor,
-            follow_symlinks=False,
-        )
-        if (
-            not stat.S_ISREG(final_info.st_mode)
-            or entry_identity(final_info) != temporary_identity
-        ):
-            raise RuntimeError(
-                "inventory destination changed during publication"
+        try:
+            named_archive_descriptor = os.open(
+                "local_archive",
+                DIRECTORY_NOFOLLOW_FLAGS,
+                dir_fd=repo_descriptor,
             )
+        except OSError as exc:
+            raise RuntimeError(
+                "local_archive changed during inventory write"
+            ) from exc
+        try:
+            try:
+                named_archive_info = os.stat(
+                    "local_archive",
+                    dir_fd=repo_descriptor,
+                    follow_symlinks=False,
+                )
+                reopened_archive_info = os.fstat(
+                    named_archive_descriptor
+                )
+            except OSError as exc:
+                raise RuntimeError(
+                    "local_archive changed during inventory write"
+                ) from exc
+            if (
+                not stat.S_ISDIR(named_archive_info.st_mode)
+                or not stat.S_ISDIR(reopened_archive_info.st_mode)
+                or directory_identity(named_archive_info)
+                != initial_archive_identity
+                or directory_identity(reopened_archive_info)
+                != initial_archive_identity
+            ):
+                raise RuntimeError(
+                    "local_archive changed during inventory write"
+                )
+            final_info = os.stat(
+                destination.name,
+                dir_fd=named_archive_descriptor,
+                follow_symlinks=False,
+            )
+            if (
+                not stat.S_ISREG(final_info.st_mode)
+                or entry_identity(final_info) != temporary_identity
+            ):
+                raise RuntimeError(
+                    "inventory destination changed during publication"
+                )
+        finally:
+            os.close(named_archive_descriptor)
         succeeded = True
     finally:
         if temporary_descriptor is not None:

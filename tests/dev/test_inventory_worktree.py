@@ -778,6 +778,174 @@ class InventoryCoreTests(unittest.TestCase):
             self.assertFalse(output.exists())
             self.assertEqual(list(archive.iterdir()), [])
 
+    def test_writer_cleans_up_if_temporary_fchmod_fails(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            archive = repo / "local_archive"
+            archive.mkdir()
+            output = inventory.resolve_output(
+                repo,
+                "local_archive/inventory.json",
+            )
+            captured_descriptor = None
+
+            def fail_temporary_fchmod(descriptor, mode):
+                nonlocal captured_descriptor
+                captured_descriptor = descriptor
+                raise OSError("injected temporary fchmod failure")
+
+            with (
+                mock.patch.object(
+                    inventory.os,
+                    "fchmod",
+                    side_effect=fail_temporary_fchmod,
+                ),
+                self.assertRaisesRegex(
+                    OSError,
+                    "injected temporary fchmod failure",
+                ),
+            ):
+                inventory.write_new_atomic(output, {"schema_version": 1})
+
+            self.assertIsNotNone(captured_descriptor)
+            try:
+                os.fstat(captured_descriptor)
+            except OSError:
+                descriptor_closed = True
+            else:
+                descriptor_closed = False
+            remaining = sorted(path.name for path in archive.iterdir())
+            if not descriptor_closed:
+                os.close(captured_descriptor)
+            for path in archive.iterdir():
+                path.unlink()
+            self.assertEqual(
+                (descriptor_closed, remaining),
+                (True, []),
+            )
+
+    def test_writer_cleans_up_if_initial_temporary_fstat_fails(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            archive = repo / "local_archive"
+            archive.mkdir()
+            output = inventory.resolve_output(
+                repo,
+                "local_archive/inventory.json",
+            )
+            original_open = inventory.os.open
+            original_fstat = inventory.os.fstat
+            captured_descriptor = None
+
+            def capture_temporary_open(target, flags, *args, **kwargs):
+                nonlocal captured_descriptor
+                descriptor = original_open(
+                    target,
+                    flags,
+                    *args,
+                    **kwargs,
+                )
+                if (
+                    isinstance(target, str)
+                    and target.startswith(".inventory-")
+                ):
+                    captured_descriptor = descriptor
+                return descriptor
+
+            def fail_temporary_fstat(descriptor):
+                if descriptor == captured_descriptor:
+                    raise OSError("injected temporary fstat failure")
+                return original_fstat(descriptor)
+
+            with (
+                mock.patch.object(
+                    inventory.os,
+                    "open",
+                    side_effect=capture_temporary_open,
+                ),
+                mock.patch.object(
+                    inventory.os,
+                    "fstat",
+                    side_effect=fail_temporary_fstat,
+                ),
+                self.assertRaisesRegex(
+                    OSError,
+                    "injected temporary fstat failure",
+                ),
+            ):
+                inventory.write_new_atomic(output, {"schema_version": 1})
+
+            self.assertIsNotNone(captured_descriptor)
+            try:
+                os.fstat(captured_descriptor)
+            except OSError:
+                descriptor_closed = True
+            else:
+                descriptor_closed = False
+            remaining = sorted(path.name for path in archive.iterdir())
+            if not descriptor_closed:
+                os.close(captured_descriptor)
+            for path in archive.iterdir():
+                path.unlink()
+            self.assertEqual(
+                (descriptor_closed, remaining),
+                (True, []),
+            )
+
+    def test_writer_refuses_archive_rebound_after_final_name_check(
+        self,
+    ) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            outside = base / "outside"
+            displaced = base / "displaced"
+            repo.mkdir()
+            outside.mkdir()
+            archive = repo / "local_archive"
+            archive.mkdir()
+            output = inventory.resolve_output(
+                repo,
+                "local_archive/inventory.json",
+            )
+            original_identity = inventory._validated_archive_identity
+            validation_count = 0
+
+            def rebound_after_final_name_check(
+                repo_descriptor,
+                archive_descriptor,
+            ):
+                nonlocal validation_count
+                identity = original_identity(
+                    repo_descriptor,
+                    archive_descriptor,
+                )
+                validation_count += 1
+                if validation_count == 2:
+                    archive.rename(displaced)
+                    archive.symlink_to(outside, target_is_directory=True)
+                return identity
+
+            with (
+                mock.patch.object(
+                    inventory,
+                    "_validated_archive_identity",
+                    side_effect=rebound_after_final_name_check,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "local_archive changed during inventory write",
+                ),
+            ):
+                inventory.write_new_atomic(output, {"schema_version": 1})
+
+            self.assertEqual(validation_count, 2)
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertEqual(list(displaced.iterdir()), [])
+
     def test_writer_refuses_regular_file_as_archive(self) -> None:
         inventory = load_inventory_module()
         with tempfile.TemporaryDirectory() as temporary:
