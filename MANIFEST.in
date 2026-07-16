@@ -1,11 +1,9 @@
-include LICENSE
-include README.md
-include CHANGELOG.md
-include RELEASE_NOTES_v0.1.0.md
-include pyproject.toml
+global-exclude *
 
+include LICENSE
+include MANIFEST.in
+include README.md
+include pyproject.toml
 recursive-include src/cellpose_mcp *.py
-recursive-include src/cellpose_mcp *.typed
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
-recursive-exclude tests *
+include src/cellpose_mcp/py.typed
+include src/cellpose_mcp/features.toml
