@@ -81,4 +81,6 @@ claude_desktop_config.json
 
 # written by setuptools_scm
 **/_version.py
- 
+
+# Local preservation and inventory reports
+/local_archive/

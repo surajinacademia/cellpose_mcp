@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
+import json
 import os
+import secrets
 import shutil
 import stat
 import subprocess
+import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -487,3 +491,325 @@ def build_inventory(repo: Path) -> dict[str, object]:
         "entries": [asdict(entry) for entry in entries],
         "totals": dict(sorted(totals.items())),
     }
+
+
+def lexical_absolute(path: Path) -> Path:
+    """Normalize one absolute path without resolving symbolic links."""
+    return Path(os.path.abspath(path))
+
+
+def archive_object_error(
+    repo_descriptor: int,
+) -> ValueError | RuntimeError:
+    """Describe why the named archive cannot be opened safely."""
+    try:
+        info = os.stat(
+            "local_archive",
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+    except FileNotFoundError:
+        return RuntimeError("local_archive changed during inventory write")
+    if stat.S_ISLNK(info.st_mode):
+        return ValueError("local_archive must not be a symbolic link")
+    return ValueError("local_archive must be a directory")
+
+
+def resolve_output(repo: Path, supplied: str | None) -> Path:
+    """Resolve one new direct-child output without following symbolic links."""
+    repository = lexical_absolute(repo)
+    archive = repository / "local_archive"
+    try:
+        archive_info = archive.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if stat.S_ISLNK(archive_info.st_mode):
+            raise ValueError("local_archive must not be a symbolic link")
+        if not stat.S_ISDIR(archive_info.st_mode):
+            raise ValueError("local_archive must be a directory")
+
+    if supplied is None:
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+        candidate = archive / f"worktree-inventory-{stamp}.json"
+    else:
+        raw = Path(supplied).expanduser()
+        candidate = lexical_absolute(
+            raw if raw.is_absolute() else repository / raw
+        )
+    if candidate.parent != archive:
+        raise ValueError(
+            "inventory output must be inside local_archive and be a "
+            "direct child of local_archive"
+        )
+    try:
+        candidate.lstat()
+    except FileNotFoundError:
+        return candidate
+    except NotADirectoryError as exc:
+        raise ValueError("local_archive must be a directory") from exc
+    raise FileExistsError(f"refusing to overwrite inventory: {candidate}")
+
+
+def directory_identity(info: os.stat_result) -> tuple[int, int]:
+    """Return the stable identity fields for one directory."""
+    return info.st_dev, info.st_ino
+
+
+def _validated_archive_identity(
+    repo_descriptor: int,
+    archive_descriptor: int,
+) -> tuple[int, int]:
+    """Prove the open archive is still the repository's named directory."""
+    try:
+        named_info = os.stat(
+            "local_archive",
+            dir_fd=repo_descriptor,
+            follow_symlinks=False,
+        )
+        opened_info = os.fstat(archive_descriptor)
+    except OSError as exc:
+        raise RuntimeError(
+            "local_archive changed during inventory write"
+        ) from exc
+    if (
+        not stat.S_ISDIR(named_info.st_mode)
+        or not stat.S_ISDIR(opened_info.st_mode)
+        or directory_identity(named_info) != directory_identity(opened_info)
+    ):
+        raise RuntimeError("local_archive changed during inventory write")
+    return directory_identity(opened_info)
+
+
+def create_temporary_report(archive_descriptor: int) -> tuple[int, str]:
+    """Create one unique mode-0600 temporary report by archive descriptor."""
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | os.O_NOFOLLOW
+        | os.O_CLOEXEC
+    )
+    for _ in range(128):
+        name = f".inventory-{secrets.token_hex(16)}.tmp"
+        try:
+            descriptor = os.open(
+                name,
+                flags,
+                0o600,
+                dir_fd=archive_descriptor,
+            )
+        except FileExistsError:
+            continue
+        os.fchmod(descriptor, 0o600)
+        return descriptor, name
+    raise FileExistsError("could not allocate a unique inventory temporary")
+
+
+def entry_identity(info: os.stat_result) -> tuple[int, int]:
+    """Return identity fields used to recognize operation-owned links."""
+    return info.st_dev, info.st_ino
+
+
+def unlink_if_owned(
+    archive_descriptor: int,
+    name: str,
+    identity: tuple[int, int],
+) -> None:
+    """Remove one named link only while it still identifies our file."""
+    try:
+        info = os.stat(
+            name,
+            dir_fd=archive_descriptor,
+            follow_symlinks=False,
+        )
+    except FileNotFoundError:
+        return
+    if entry_identity(info) != identity:
+        return
+    try:
+        os.unlink(name, dir_fd=archive_descriptor)
+    except FileNotFoundError:
+        pass
+
+
+def write_new_atomic(path: Path, document: dict[str, object]) -> None:
+    """Publish one complete mode-0600 report without following or overwriting."""
+    destination = lexical_absolute(path)
+    archive = destination.parent
+    if archive.name != "local_archive" or not destination.name:
+        raise ValueError(
+            "inventory output must be a direct child of local_archive"
+        )
+    repository = archive.parent
+    try:
+        repo_descriptor = os.open(repository, DIRECTORY_NOFOLLOW_FLAGS)
+    except OSError as exc:
+        raise ValueError(
+            f"repository directory cannot be opened safely: {repository}"
+        ) from exc
+
+    archive_descriptor: int | None = None
+    temporary_descriptor: int | None = None
+    temporary_name: str | None = None
+    temporary_identity: tuple[int, int] | None = None
+    published = False
+    succeeded = False
+    try:
+        created_archive = False
+        try:
+            os.mkdir(
+                "local_archive",
+                mode=0o700,
+                dir_fd=repo_descriptor,
+            )
+            created_archive = True
+        except FileExistsError:
+            pass
+        try:
+            archive_descriptor = os.open(
+                "local_archive",
+                DIRECTORY_NOFOLLOW_FLAGS,
+                dir_fd=repo_descriptor,
+            )
+        except OSError as exc:
+            raise archive_object_error(repo_descriptor) from exc
+        if created_archive:
+            os.fchmod(archive_descriptor, 0o700)
+        initial_archive_identity = _validated_archive_identity(
+            repo_descriptor,
+            archive_descriptor,
+        )
+
+        temporary_descriptor, temporary_name = create_temporary_report(
+            archive_descriptor
+        )
+        temporary_identity = entry_identity(
+            os.fstat(temporary_descriptor)
+        )
+        with os.fdopen(
+            temporary_descriptor,
+            "w",
+            encoding="utf-8",
+            closefd=False,
+        ) as stream:
+            json.dump(document, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.close(temporary_descriptor)
+        temporary_descriptor = None
+
+        try:
+            os.link(
+                temporary_name,
+                destination.name,
+                src_dir_fd=archive_descriptor,
+                dst_dir_fd=archive_descriptor,
+                follow_symlinks=False,
+            )
+        except FileExistsError as exc:
+            raise FileExistsError(
+                f"refusing to overwrite inventory: {destination}"
+            ) from exc
+        published = True
+        final_info = os.stat(
+            destination.name,
+            dir_fd=archive_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(final_info.st_mode)
+            or entry_identity(final_info) != temporary_identity
+        ):
+            raise RuntimeError(
+                "inventory destination changed during publication"
+            )
+
+        unlink_if_owned(
+            archive_descriptor,
+            temporary_name,
+            temporary_identity,
+        )
+        temporary_name = None
+        os.fsync(archive_descriptor)
+        final_archive_identity = _validated_archive_identity(
+            repo_descriptor,
+            archive_descriptor,
+        )
+        if final_archive_identity != initial_archive_identity:
+            raise RuntimeError(
+                "local_archive changed during inventory write"
+            )
+        final_info = os.stat(
+            destination.name,
+            dir_fd=archive_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(final_info.st_mode)
+            or entry_identity(final_info) != temporary_identity
+        ):
+            raise RuntimeError(
+                "inventory destination changed during publication"
+            )
+        succeeded = True
+    finally:
+        if temporary_descriptor is not None:
+            os.close(temporary_descriptor)
+        if archive_descriptor is not None:
+            if not succeeded and published and temporary_identity is not None:
+                unlink_if_owned(
+                    archive_descriptor,
+                    destination.name,
+                    temporary_identity,
+                )
+            if temporary_name is not None and temporary_identity is not None:
+                unlink_if_owned(
+                    archive_descriptor,
+                    temporary_name,
+                    temporary_identity,
+                )
+            os.close(archive_descriptor)
+        os.close(repo_descriptor)
+
+
+def main() -> int:
+    """Inventory one repository and write one new local report."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", type=Path, default=Path.cwd())
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    try:
+        repo = args.repo.expanduser().resolve(strict=True)
+        top_level = Path(
+            decode_path(
+                git_output(
+                    repo,
+                    "rev-parse",
+                    "--show-toplevel",
+                ).rstrip(b"\n")
+            )
+        ).resolve(strict=True)
+        if top_level != repo:
+            raise ValueError("--repo must be the Git worktree root")
+        output = resolve_output(repo, args.output)
+        document = build_inventory(repo)
+        write_new_atomic(output, document)
+    except (
+        OSError,
+        RuntimeError,
+        subprocess.CalledProcessError,
+        ValueError,
+    ) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(
+        f"inventory written to {output.relative_to(repo)}: "
+        f"{document['totals']}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
