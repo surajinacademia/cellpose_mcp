@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
-import os
 import shutil
 import stat
 import subprocess
@@ -31,12 +30,13 @@ def load_inventory_module():
     return module
 
 
-def git(repo: Path, *args: str) -> None:
-    subprocess.run(
+def git(repo: Path, *args: str) -> bytes:
+    completed = subprocess.run(
         [GIT, "--no-optional-locks", "-C", str(repo), *args],
         check=True,
         capture_output=True,
     )
+    return completed.stdout
 
 
 def create_dirty_repo(base: Path) -> Path:
@@ -129,9 +129,9 @@ class InventoryCoreTests(unittest.TestCase):
                     inventory,
                     "file_identity",
                     side_effect=[
-                        (1, 2, 7, 10, stat.S_IFREG),
-                        (1, 2, 7, 10, stat.S_IFREG),
-                        (1, 3, 8, 11, stat.S_IFREG),
+                        (1, 2, 7, 10, 12, stat.S_IFREG),
+                        (1, 2, 7, 10, 12, stat.S_IFREG),
+                        (1, 3, 8, 11, 13, stat.S_IFREG),
                     ],
                 ),
                 self.assertRaisesRegex(
@@ -140,6 +140,215 @@ class InventoryCoreTests(unittest.TestCase):
                 ),
             ):
                 inventory.hash_regular_stable(path)
+
+    def test_inventory_refuses_symlinked_worktree_ancestor(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            repo.mkdir()
+            git(repo, "init")
+            git(repo, "config", "user.email", "inventory@example.invalid")
+            git(repo, "config", "user.name", "Inventory Test")
+            directory = repo / "dir"
+            directory.mkdir()
+            tracked = directory / "file"
+            tracked.write_bytes(b"inside\n")
+            git(repo, "add", "dir/file")
+            git(repo, "commit", "-m", "nested fixture")
+
+            external = base / "external"
+            external.mkdir()
+            (external / "file").write_bytes(b"outside\n")
+            tracked.unlink()
+            directory.rmdir()
+            directory.symlink_to(external, target_is_directory=True)
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "symbolic link in worktree path",
+            ):
+                inventory.build_inventory(repo)
+
+    def test_inspection_aborts_if_classified_file_is_replaced_before_open(
+        self,
+    ) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            victim = repo / "victim"
+            original = repo / "original"
+            victim.write_bytes(b"content")
+            original_open = inventory.os.open
+            replaced = False
+
+            def replacing_open(target, flags, *args, **kwargs):
+                nonlocal replaced
+                if not replaced and target in (victim, victim.name):
+                    victim.replace(original)
+                    victim.write_bytes(b"changed")
+                    replaced = True
+                return original_open(target, flags, *args, **kwargs)
+
+            with (
+                mock.patch.object(
+                    inventory.os,
+                    "open",
+                    side_effect=replacing_open,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "changed while it was being hashed",
+                ),
+            ):
+                inventory.inspect_worktree(repo, victim.name)
+            self.assertTrue(replaced)
+
+    def test_file_identity_includes_ctime(self) -> None:
+        inventory = load_inventory_module()
+        info = mock.Mock(
+            st_dev=1,
+            st_ino=2,
+            st_size=3,
+            st_mtime_ns=4,
+            st_ctime_ns=5,
+            st_mode=stat.S_IFREG,
+        )
+
+        self.assertEqual(
+            inventory.file_identity(info),
+            (1, 2, 3, 4, 5, stat.S_IFREG),
+        )
+
+    def test_inventory_preserves_gitlink_mode_and_type(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            repo.mkdir()
+            git(repo, "init")
+            git(repo, "config", "user.email", "inventory@example.invalid")
+            git(repo, "config", "user.name", "Inventory Test")
+            (repo / "seed").write_bytes(b"seed\n")
+            git(repo, "add", "seed")
+            git(repo, "commit", "-m", "seed")
+            target_commit = git(repo, "rev-parse", "HEAD").decode().strip()
+            git(
+                repo,
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                target_commit,
+                "module",
+            )
+            git(repo, "commit", "-m", "gitlink")
+
+            try:
+                document = inventory.build_inventory(repo)
+            except subprocess.CalledProcessError as exc:
+                self.fail(f"valid gitlink inventory aborted: {exc}")
+            entries = {
+                entry["path"]: entry
+                for entry in document["entries"]
+            }
+            gitlink = entries["module"]
+            self.assertEqual(gitlink["index_object_id"], target_commit)
+            self.assertEqual(gitlink["index_mode"], "160000")
+            self.assertEqual(gitlink["index_type"], "commit")
+            self.assertIsNone(gitlink["index_sha256"])
+
+    def test_inventory_aborts_if_worktree_status_changes(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = create_dirty_repo(Path(temporary))
+            before = inventory.changed_paths(repo)
+            after = {**before, "clean.txt": " M"}
+
+            with (
+                mock.patch.object(
+                    inventory,
+                    "changed_paths",
+                    side_effect=[before, after],
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "worktree status changed during inventory",
+                ),
+            ):
+                inventory.build_inventory(repo)
+
+    def test_inventory_aborts_if_head_changes(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = create_dirty_repo(Path(temporary))
+            original_git_output = inventory.git_output
+            heads = iter([b"1" * 40 + b"\n", b"2" * 40 + b"\n"])
+
+            def changing_git_output(query_repo, *args):
+                if args == ("rev-parse", "HEAD"):
+                    return next(heads)
+                return original_git_output(query_repo, *args)
+
+            with (
+                mock.patch.object(
+                    inventory,
+                    "git_output",
+                    side_effect=changing_git_output,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "HEAD changed during inventory",
+                ),
+            ):
+                inventory.build_inventory(repo)
+
+    def test_index_identity_refuses_symlinks(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            target = base / "real-index"
+            target.write_bytes(b"index")
+            link = base / "index"
+            link.symlink_to(target.name)
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Git index path is not a stable regular file",
+            ):
+                inventory.index_identity(link)
+
+    def test_index_identity_aborts_if_path_is_replaced_during_read(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            path = base / "index"
+            original = base / "original-index"
+            path.write_bytes(b"original index")
+            original_read = inventory.os.read
+            replaced = False
+
+            def replacing_read(descriptor, size):
+                nonlocal replaced
+                chunk = original_read(descriptor, size)
+                if not replaced:
+                    path.replace(original)
+                    path.write_bytes(b"replacement")
+                    replaced = True
+                return chunk
+
+            with (
+                mock.patch.object(
+                    inventory.os,
+                    "read",
+                    side_effect=replacing_read,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "Git index changed while it was being read",
+                ),
+            ):
+                inventory.index_identity(path)
+            self.assertTrue(replaced)
 
 
 if __name__ == "__main__":
