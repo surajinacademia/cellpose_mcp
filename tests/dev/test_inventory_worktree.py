@@ -170,6 +170,52 @@ class InventoryCoreTests(unittest.TestCase):
             ):
                 inventory.build_inventory(repo)
 
+    def test_inventory_records_missing_file_below_deleted_directory(
+        self,
+    ) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            repo.mkdir()
+            git(repo, "init")
+            git(repo, "config", "user.email", "inventory@example.invalid")
+            git(repo, "config", "user.name", "Inventory Test")
+            directory = repo / "dir"
+            directory.mkdir()
+            tracked = directory / "file"
+            content = b"nested\n"
+            tracked.write_bytes(content)
+            git(repo, "add", "dir/file")
+            git(repo, "commit", "-m", "nested fixture")
+            object_id = git(
+                repo,
+                "rev-parse",
+                "HEAD:dir/file",
+            ).decode().strip()
+            shutil.rmtree(directory)
+
+            try:
+                document = inventory.build_inventory(repo)
+            except RuntimeError as exc:
+                self.fail(f"nested deletion aborted inventory: {exc}")
+            entries = {
+                entry["path"]: entry
+                for entry in document["entries"]
+            }
+            missing = entries["dir/file"]
+            self.assertEqual(missing["category"], "modified")
+            self.assertEqual(missing["git_status"], " D")
+            self.assertEqual(missing["kind"], "missing")
+            self.assertIsNone(missing["worktree_size"])
+            self.assertIsNone(missing["worktree_sha256"])
+            self.assertEqual(missing["index_object_id"], object_id)
+            self.assertEqual(missing["index_mode"], "100644")
+            self.assertEqual(missing["index_type"], "blob")
+            self.assertEqual(
+                missing["index_sha256"],
+                hashlib.sha256(content).hexdigest(),
+            )
+
     def test_inspection_aborts_if_classified_file_is_replaced_before_open(
         self,
     ) -> None:

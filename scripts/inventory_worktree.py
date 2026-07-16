@@ -217,6 +217,9 @@ def open_worktree_parent(
                 DIRECTORY_NOFOLLOW_FLAGS,
                 dir_fd=descriptors[-1],
             )
+        except FileNotFoundError:
+            close_descriptors(descriptors)
+            raise
         except OSError as exc:
             close_descriptors(descriptors)
             raise RuntimeError(
@@ -264,7 +267,10 @@ def inspect_worktree(
 ) -> tuple[str, int | None, str | None]:
     """Inspect one path without following symbolic links."""
     path = repo / relative
-    descriptors, components = open_worktree_parent(repo, relative)
+    try:
+        descriptors, components = open_worktree_parent(repo, relative)
+    except FileNotFoundError:
+        return "missing", None, None
     parent_descriptor = descriptors[-1]
     leaf = components[-1]
     try:
