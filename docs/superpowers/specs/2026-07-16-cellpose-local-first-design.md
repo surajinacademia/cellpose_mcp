@@ -267,7 +267,10 @@ version. A handshake failure disables that worker and reports
 
 ### 7.1 Controller
 
-- Target Python: 3.12.
+- Controller environment: Python 3.12.
+- Public wheel compatibility: Python 3.11 and 3.12, because the same wheel
+  provides worker entry points installed into the Python 3.11 CP3 environment.
+- Published metadata: `Requires-Python >=3.11,<3.13`.
 - FastMCP: a stable 3.x release locked with hashes and an explicit upper bound.
 - Cellpose is not a controller dependency.
 - Runtime resolution is captured in a committed lock file.
@@ -292,6 +295,10 @@ version. A handshake failure disables that worker and reports
 - Only documented user-facing restoration families and modes are eligible:
   denoise, deblur, upsample, and one-click restore-and-segment for validated
   cyto3, cyto2, and nuclei checkpoints.
+- Restoration checkpoints come from a curated controller-owned catalog with
+  pinned sources and expected hashes. The controller stages, verifies, and
+  atomically registers downloads after consent; the CP3 worker has no download
+  authority and must support verified offline reuse.
 - Research, loss-ablation, anisotropic research, and undocumented checkpoint
   variants are excluded.
 - CP3 segmentation is used only where required by the validated restoration
@@ -525,16 +532,30 @@ Every successful segmentation produces:
 - PNG preview or overlay.
 - JSON provenance manifest.
 - Compact JSON summary.
+- A controller-managed, hash-validated flow and cell-probability cache stored
+  without pickle for every segmentation mode registered as refinement-capable.
+  This cache is an internal run artifact and is not presented as an optional
+  user export.
+
+Every successful restoration produces:
+
+- A lossless restored image in a validated dtype/format.
+- A JSON provenance manifest and compact summary.
+- For restore-and-segment, a lossless label-mask TIFF and preview in addition
+  to the restored image.
+
+Every successful training run produces:
+
+- Training loss history.
+- Trained-model metadata and checksum.
+- A JSON provenance manifest and compact summary.
 
 Optional artifacts ship only after individual round-trip tests:
 
-- Flow and cell-probability arrays stored without pickle.
 - Outline images and coordinate exports.
 - ImageJ ROI ZIP.
 - `_seg.npy` output created by this product.
 - Plots.
-- Restored images.
-- Training loss history and trained model metadata.
 
 JPEG is permitted as an input but never as a label-mask output.
 
@@ -620,6 +641,8 @@ Before a worker starts, the controller validates:
 - Batch uniqueness and output-name collisions.
 - Training image/mask pairing and label validity.
 
+The baseline `0.2.0` input matrix is TIFF, OME-TIFF, PNG, and JPEG
+(`.jpg`/`.jpeg`). Each has real inspection and segmentation evidence.
 Optional ND2, NRRD, OME-Zarr, or other formats are absent unless their
 dependency and round-trip test gates pass.
 
@@ -823,8 +846,11 @@ The installed Codex skill:
 - Teaches 2D, orthoplane 3D, and slice-stitch differences.
 - Explains CP4 diameter as optional rescaling, not estimation.
 - Uses `cpsam_v2` by default.
-- Requires explicit confirmation for downloads, DINO, training, or
-  administrative changes.
+- Requires explicit confirmation for downloads, training, or administrative
+  changes.
+- Includes DINO guidance only if a DINO variant passes promotion; that
+  conditional guidance requires its explicit license acceptance and download
+  consent.
 - Requires job polling and final manifest review.
 - Encourages preview and measurement before declaring success.
 - Never instructs Codex to invoke Python, shell, or private worker APIs.
@@ -855,6 +881,14 @@ stable feature records:
 
 Documentation and capability output are checked against this manifest.
 
+Repository bootstrap may contain an explicitly blocked manifest schema with no
+stable records while pinned upstream probes resolve the required capability
+matrix. A feature-promotion change adds the stable manifest record,
+registration, schema, documentation, and evidence references atomically. That
+change is accepted only when every reference resolves and passes. Test-only or
+candidate records never project into release schemas, capability output,
+documentation, or artifacts.
+
 ### 16.2 Shipping Rule
 
 A release contains no experimental public feature. A feature ships only when:
@@ -872,9 +906,10 @@ release pass. Optional DINO and Zarr features are entirely absent from the
 registered surface unless they pass the same gate.
 
 When an optional capability is absent, schemas exclude its enum values and
-documentation does not present it as callable. `get_capabilities` may explain
-that the release does not support it, but no request can select an unavailable
-mode or model.
+product documentation does not present it as callable. `get_capabilities`,
+model lists, and machine-readable release artifacts contain no feature, mode,
+or model entry for it. Human-readable release limitations may state that it is
+unsupported, but no request can select an unavailable mode or model.
 
 ## 17. Testing Strategy
 
@@ -978,9 +1013,14 @@ A compatibility-error test is not accepted as feature evidence.
 
 - Build sdist and wheel from a clean checkout.
 - Inspect contents against an allowlist.
+- Verify wheel metadata is `Requires-Python >=3.11,<3.13`, and compile,
+  install, and import the entire public wheel on clean Python 3.11 and 3.12.
 - Install the wheel into an empty environment.
 - Provision empty CP4 and CP3 worker environments from lock files.
 - Launch every installed console entry point.
+- Launch the CP3 entry point on Python 3.11 and the controller/CP4 entry points
+  on Python 3.12; verify the shared controller source remains
+  Python-3.11-parseable.
 - Run MCP initialization from the installed wheel.
 - Run a real segmentation and restoration through the installed product.
 - Test setup in an isolated temporary home.
@@ -1038,6 +1078,8 @@ Each step records the package version, environment, result, and evidence.
 Before cleanup:
 
 - Record tracked, modified, and untracked paths with sizes and hashes.
+- Record any Git-ignored cache/build path separately before it is considered
+  for cleanup; an ignored path is never implicitly safe to delete.
 - Preserve critical untracked source and tests as migration inputs.
 - Never use `git clean`, destructive reset, or broad deletion.
 - Move uncertain experiments into an ignored `local_archive/`.
@@ -1103,22 +1145,25 @@ break.
 
 Implementation proceeds through internal gates:
 
-1. **Repository foundation:** inventory, feature manifest, packaging boundary,
-   schemas, errors, and path policy.
-2. **Controller foundation:** daemon, authentication, SQLite, worker protocol,
+1. **Repository preservation:** worktree/index inventory, explicitly blocked
+   bootstrap feature ledger, Python policy/lock, and clean artifact boundary.
+2. **Contract foundation:** pinned CP4/CP3 probes, granular capability matrix,
+   stable schemas/IDs/errors, image inspection, consent contracts, and
+   descriptor-based path policy.
+3. **Controller foundation:** daemon, authentication, SQLite, worker protocol,
    supervisor, stdio shim, and cancellation.
-3. **CP4 inference:** current models, inspection, 2D/3D/stitch/batch, artifacts,
+4. **CP4 inference:** current models, inspection, 2D/3D/stitch/batch, artifacts,
    and real tests.
-4. **Analysis:** refinement, measurements, evaluation, and export formats.
-5. **Training:** dataset validation, bounded CPSAM training, registry, and
+5. **Analysis:** refinement, measurements, evaluation, and export formats.
+6. **Training:** dataset validation, bounded CPSAM training, registry, and
    inference with trained output.
-6. **CP3 restoration:** isolated environment and every registered restoration
+7. **CP3 restoration:** isolated environment and every registered restoration
    workflow.
-7. **Optional capabilities:** DINO and Zarr only if their full gates pass.
-8. **Codex experience:** setup, doctor, skill, migration, and truthful docs.
-9. **Audit:** security, reliability, supply chain, feature traceability, and
+8. **Optional capabilities:** DINO and Zarr only if their full gates pass.
+9. **Codex experience:** setup, doctor, skill, migration, and truthful docs.
+10. **Audit:** security, reliability, supply chain, feature traceability, and
    stale-content review.
-10. **Release candidate:** fresh installation and complete user journey.
+11. **Release candidate:** fresh installation and complete user journey.
 
 No stable public release occurs between these gates.
 
@@ -1159,6 +1204,11 @@ publication, an external clean environment installs
 `cellpose-mcp==0.2.0` from the public PyPI index and runs a protocol,
 controller, CP4, and CP3 smoke test.
 
+Because the registries cannot publish atomically, the workflow first creates a
+draft GitHub release and uploads the immutable artifacts and checksums, then
+uploads those exact hashes to PyPI, runs the public-PyPI smoke, and only then
+publishes the GitHub release.
+
 ### 20.4 Rollback
 
 - Setup retains the previous controller and worker environment metadata until
@@ -1172,6 +1222,9 @@ controller, CP4, and CP3 smoke test.
   the GitHub release as withdrawn, publishes a visible warning, and rolls
   documentation back to the last supported version. Published artifacts are
   never overwritten; the correction uses a new patch release.
+- If GitHub publication fails after PyPI becomes public, PyPI is yanked, the
+  draft is retained as a withdrawn evidence record where possible, users are
+  warned, and correction occurs only in a new patch release.
 
 ## 21. Deferred Work
 
