@@ -7,7 +7,7 @@ name = "cellpose-mcp"
 version = "0.1.4"
 description = "MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.13"
 license = {text = "BSD-3-Clause"}
 authors = [
     {name = "Suraj Sahu", email = "surajinacademia@users.noreply.github.com"}
@@ -21,9 +21,8 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
-    "Operating System :: OS Independent",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Image Processing",
@@ -37,6 +36,7 @@ dependencies = [
     "tifffile>=2021.0.0",
     "typer>=0.9.0",
     "rich>=13.0.0",
+    "pydantic>=2.11,<3",
 ]
 
 [project.urls]
@@ -52,6 +52,7 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-timeout>=2.2.0",
     "pytest-mock>=3.12.0",
+    "build>=1.2,<2",
 ]
 dev = [
     "ruff>=0.12.10",
@@ -68,6 +69,9 @@ cellpose-mcp-install = "cellpose_mcp.cli.install:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+cellpose_mcp = ["features.toml", "py.typed"]
 
 [tool.setuptools_scm]
 write_to = "src/cellpose_mcp/_version.py"
@@ -101,7 +105,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py311"
 exclude = [
     ".bzr",
     ".direnv",
@@ -122,7 +126,7 @@ exclude = [
     "*_vendor*",
     "*_version.py",
 ]
-fix = true
+fix = false
 
 [tool.ruff.lint]
 select = [
@@ -151,7 +155,7 @@ ignore = [
     "S101",   # assert detected - allow in tests
     "S110",   # try-except-pass - acceptable for best-effort operations
     "SIM105", # contextlib.suppress - prefer explicit try/except
-    "TCH003", # typing-only imports - not critical
+    "TC003",  # typing-only imports - not critical
     "D401",   # imperative mood - not critical
 ]
 
@@ -178,10 +182,10 @@ line-ending = "auto"
 
 [tool.black]
 line-length = 88
-target-version = ['py310', 'py311', 'py312']
+target-version = ["py311", "py312"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
