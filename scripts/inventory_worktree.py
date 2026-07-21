@@ -512,7 +512,9 @@ def archive_object_error(
         return RuntimeError("local_archive changed during inventory write")
     if stat.S_ISLNK(info.st_mode):
         return ValueError("local_archive must not be a symbolic link")
-    return ValueError("local_archive must be a directory")
+    if not stat.S_ISDIR(info.st_mode):
+        return ValueError("local_archive must be a directory")
+    return RuntimeError("local_archive cannot be opened safely")
 
 
 def resolve_output(repo: Path, supplied: str | None) -> Path:

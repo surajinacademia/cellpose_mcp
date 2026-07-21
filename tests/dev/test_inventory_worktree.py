@@ -963,6 +963,26 @@ class InventoryCoreTests(unittest.TestCase):
 
             self.assertEqual(archive.read_bytes(), sentinel)
 
+    def test_archive_directory_open_failure_is_not_a_type_error(self) -> None:
+        inventory = load_inventory_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            (repo / "local_archive").mkdir()
+            repo_descriptor = os.open(
+                repo,
+                inventory.DIRECTORY_NOFOLLOW_FLAGS,
+            )
+            try:
+                error = inventory.archive_object_error(repo_descriptor)
+            finally:
+                os.close(repo_descriptor)
+
+            self.assertIsInstance(error, RuntimeError)
+            self.assertEqual(
+                str(error),
+                "local_archive cannot be opened safely",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
