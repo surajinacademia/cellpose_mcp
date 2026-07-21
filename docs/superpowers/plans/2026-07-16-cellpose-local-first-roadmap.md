@@ -146,7 +146,7 @@ flowchart TD
 
 **Detailed plan names:**
 
-- `2026-07-16-cellpose-upstream-contract-probes.md`
+- `2026-07-21-cellpose-upstream-contract-probes.md`
 - `2026-07-16-cellpose-domain-contracts.md`
 - `2026-07-16-cellpose-image-inspection.md`
 
