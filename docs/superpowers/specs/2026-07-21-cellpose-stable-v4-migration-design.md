@@ -1,11 +1,8 @@
 # Stable Cellpose v4 Migration Design Amendment
 
-**Status:** Proposed for written review
+**Status:** Approved
 
-**Direction approved:** 2026-07-21
-
-The architecture and stable-v4 direction were approved in conversation. This
-exact written revision remains pending explicit user review.
+**Approved:** 2026-07-21
 
 **Date:** 2026-07-21
 
