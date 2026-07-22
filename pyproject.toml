@@ -53,6 +53,9 @@ test = [
     "pytest-timeout>=2.2.0",
     "pytest-mock>=3.12.0",
     "build>=1.2,<2",
+    "setuptools>=64",
+    "setuptools_scm>=8.0",
+    "wheel",
 ]
 dev = [
     "ruff>=0.12.10",

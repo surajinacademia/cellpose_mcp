@@ -23,13 +23,27 @@ def test_public_python_range_and_classifiers_are_exact() -> None:
     assert "Programming Language :: Python :: 3.12" in classifiers
 
 
-def test_foundation_dependencies_are_direct() -> None:
-    project = config()["project"]
+def test_required_foundation_dependencies_are_direct() -> None:
+    document = config()
+    project = document["project"]
     assert isinstance(project, dict)
     assert "pydantic>=2.11,<3" in project["dependencies"]
+
     optional = project["optional-dependencies"]
     assert isinstance(optional, dict)
-    assert "build>=1.2,<2" in optional["test"]
+    test_dependencies = optional["test"]
+    assert isinstance(test_dependencies, list)
+    assert "build>=1.2,<2" in test_dependencies
+
+    build_system = document["build-system"]
+    assert isinstance(build_system, dict)
+    build_requirements = [
+        "setuptools>=64",
+        "setuptools_scm>=8.0",
+        "wheel",
+    ]
+    assert build_system["requires"] == build_requirements
+    assert all(item in test_dependencies for item in build_requirements)
 
 
 def test_package_data_contains_only_current_foundation_assets() -> None:
