@@ -81,7 +81,7 @@ pytest, Ruff, and mypy.
   An exact sanitized `INTERPRETER --version` executable preflight is the sole
   direct-interpreter exception because it executes no repository/runtime code.
   `uv ... --python INTERPRETER`, `uv run` entrypoints such as `pytest`, and shell
-  hash/readlink operations are wrapper/tool invocations, not direct Python
+  hash/canonical-path operations are wrapper/tool invocations, not direct Python
   commands. Every explicit `uv run ... python` payload still supplies `-B -I`.
   Exact command tests freeze all applicable flags and their order.
 - No probe calls any of these five constructors: `CellposeModel(...)`,
@@ -225,10 +225,12 @@ same-fence controller gate, via this helper or its exact inline equivalent, for
 uv and every selected managed Python,
 using the three hashes and exact version strings from Task 0. A Task 7
 official-metadata fence invokes no uv or separate managed-runtime path. It uses
-`/usr/bin/shasum` for data files, requires the controller symlink's exact lexical
-target with `/usr/bin/readlink`, then applies the hash/version gate to the
-controller environment's Python before its first Python execution. That target
-must be the sealed CP4/controller Python:
+`/usr/bin/shasum` for data files, resolves the controller interpreter with
+`Path.resolve(strict=True)`, then applies the pinned executable hash/version
+gate to the controller environment's Python before its first Python execution
+or reservation of an exclusive output path. A lexical symlink spelling may be
+logged as diagnostic data, but is never correctness authority. The canonical
+target must be the sealed CP4/controller Python:
 
 ```text
 probe_require_tool() {
@@ -292,7 +294,7 @@ The root controller lock is the already Phase-0-validated immutable exception
 to invoking the Task-1 validator before that validator exists. This plan never
 modifies `uv.lock`; every root, candidate, clean-clone, acceptance, and
 reproduction controller fence independently requires its SHA-256 to equal
-`dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b`
+`aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec`
 before sync. Any different root lock stops the plan for review. After Task 1,
 the validator's synthetic and probe-lock tests prove the same complete-closure
 policy; no root sync is authorized by a merely shape-valid 64-hex digest.
@@ -542,10 +544,11 @@ The offline generator CLI is:
 ```
 
 That command also requires
-`--provisioning-home ABSOLUTE_FRESH_PROVISIONING_HOME` and
-`--provisioning-tmp ABSOLUTE_FRESH_PROVISIONING_TMP`; the two paths are
-distinct absent children of one runner-owned private root and are never the
-measured child's HOME/TMP.
+`--provisioning-home ABSOLUTE_PRIVATE_PROVISIONING_HOME` and
+`--provisioning-tmp ABSOLUTE_PRIVATE_PROVISIONING_TMP`; the two paths are
+distinct children of one runner-owned private root and are never the measured
+child's HOME/TMP. They begin absent for a new evidence unit; recovery may
+reuse them only as part of a complete validated report/digest/environment unit.
 
 The official metadata CLI is:
 
@@ -1025,9 +1028,11 @@ They additionally require `provisioning.argv[0]` and
 `provisioning.executable_path` to bind the approved uv executable,
 `provisioning.environment["HOME"]` and `["TMPDIR"]` to equal the two explicit
 provisioning paths, and both before/after storage hashes to match for PASS.
-Those two paths must be distinct fresh regular directories beneath the same
-new mode-0700 non-symlink parent and disjoint from the repository, controller
-HOME/TMP, warm cache, runtime environment, measured scratch, and output.
+Those two paths must be distinct private regular directories beneath the same
+mode-0700 non-symlink parent and disjoint from the repository, controller
+HOME/TMP, warm cache, runtime environment, measured scratch, and output. A new
+run creates an absent parent; a recovery run accepts only the exact complete
+validated unit described below.
 Adversarial typed-model tests mutate each equality, alias the paths, substitute
 the pre-existing `/private/tmp` parent, and change each after hash; every case
 is rejected before committed evidence can load as PASS.
@@ -1910,35 +1915,42 @@ test "$(git branch --show-current)" = "codex/cellpose-local-first"
 git diff --cached --quiet
 git merge-base --is-ancestor 45021a21604328b268f75f09c4e026ae1cdabec2 HEAD
 EXPECTED_FOUNDATION_SUBJECTS=$'ci: enforce truthful repository foundation\ntest: make distribution proof offline\nfix: clarify inventory archive failures'
-test "$(git log -3 --format=%s)" = "$EXPECTED_FOUNDATION_SUBJECTS"
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
+FOUNDATION_ACCEPTANCE_PARENT=d0039330718f4967eb4a023ebb8c463337de72f8
+FOUNDATION_ACCEPTANCE_GRANDPARENT=847e9f2dfd85568d29095e900861b828e01f3fc9
+test "$(git rev-parse "${FOUNDATION_ACCEPTANCE_SHA}^")" = "$FOUNDATION_ACCEPTANCE_PARENT"
+test "$(git rev-parse "${FOUNDATION_ACCEPTANCE_PARENT}^")" = "$FOUNDATION_ACCEPTANCE_GRANDPARENT"
+ACTUAL_FOUNDATION_SUBJECTS="$(for commit_sha in "$FOUNDATION_ACCEPTANCE_SHA" "$FOUNDATION_ACCEPTANCE_PARENT" "$FOUNDATION_ACCEPTANCE_GRANDPARENT"; do git show -s --format=%s "$commit_sha"; done)"
+test "$ACTUAL_FOUNDATION_SUBJECTS" = "$EXPECTED_FOUNDATION_SUBJECTS"
 ```
 
 Expected: the exact repository root and branch match, the index is empty,
-`45021a21604328b268f75f09c4e026ae1cdabec2` is an ancestor, and `git log -3`
-has the exact final ci/test/fix foundation subjects even though their future
-commit hashes are not yet known. Existing working-tree changes are allowed and
-remain inventoried.
+`45021a21604328b268f75f09c4e026ae1cdabec2` is an ancestor, and the immutable
+`c926877`/`d003933`/`847e9f2` chain has the exact final ci/test/fix foundation
+subjects. Later documentation commits may move `HEAD` and `git log -3` without
+invalidating this completed Phase 0 proof. Existing working-tree changes are
+allowed and remain inventoried.
 
-- [ ] **Step 2: Consume the completed Phase 0 proof without reusing fresh paths**
+- [ ] **Step 2: Consume the completed Phase 0 proof without recreating its paths**
 
 Do not re-run Task 7 Step 1 of
 `2026-07-16-cellpose-repository-foundation.md`: its clone, cache,
-environments, HOME, and TMP paths are intentionally fresh-only and remain as
-the completed Phase 0 evidence. Verify those exact artifacts offline instead:
+environments, HOME, and TMP paths are immutable completed Phase 0 evidence.
+Validate and reuse those exact artifacts offline instead:
 
 ```bash
 set -euo pipefail
 FOUNDATION_ROOT=$(pwd -P)
 test "$FOUNDATION_ROOT" = "/Users/suraj/Documents/Tools/cellpose_mcp"
-FOUNDATION_ACCEPTANCE_SHA=$(git rev-parse HEAD)
-[[ $FOUNDATION_ACCEPTANCE_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
 FOUNDATION_RUN_SHA=${FOUNDATION_ACCEPTANCE_SHA:0:12}
 FOUNDATION_ACCEPTANCE=/private/tmp/cellpose-mcp-foundation-acceptance-${FOUNDATION_RUN_SHA}
+test "$FOUNDATION_ACCEPTANCE" = /private/tmp/cellpose-mcp-foundation-acceptance-c92687710587
 test -d "$FOUNDATION_ACCEPTANCE"
 test "$(git -C "$FOUNDATION_ACCEPTANCE" rev-parse HEAD)" = "$FOUNDATION_ACCEPTANCE_SHA"
 test -z "$(git -C "$FOUNDATION_ACCEPTANCE" status --porcelain)"
 FOUNDATION_ACCEPTANCE_LOCK_SHA=$(/usr/bin/shasum -a 256 "$FOUNDATION_ACCEPTANCE/uv.lock" | /usr/bin/awk '{print $1}')
-test "$FOUNDATION_ACCEPTANCE_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$FOUNDATION_ACCEPTANCE_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 FOUNDATION_ACCEPTANCE_CACHE=/private/tmp/cellpose-mcp-foundation-acceptance-cache-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_ENV_311=/private/tmp/cellpose-mcp-foundation-acceptance-py311-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_ENV_312=/private/tmp/cellpose-mcp-foundation-acceptance-py312-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
@@ -1954,6 +1966,9 @@ test "$(/usr/bin/shasum -a 256 "$FOUNDATION_ACCEPTANCE_ENV_312/bin/python" | /us
 JUNIT_311="$FOUNDATION_ACCEPTANCE_TMP/foundation-60-py311.xml"
 JUNIT_312="$FOUNDATION_ACCEPTANCE_TMP/foundation-60-py312.xml"
 JUNIT_DISTRIBUTION="$FOUNDATION_ACCEPTANCE_TMP/foundation-distribution-19.xml"
+test "$(/usr/bin/shasum -a 256 "$JUNIT_311" | /usr/bin/awk '{print $1}')" = c7fe743c44ad572132f8acee0faf0a887634586754bb7adeddbe1c6fd7ff06e7
+test "$(/usr/bin/shasum -a 256 "$JUNIT_312" | /usr/bin/awk '{print $1}')" = 6a423a41df3af6598d59ffd3a4fc6fe0c48a26e076a783ffe0aa42e89b52411c
+test "$(/usr/bin/shasum -a 256 "$JUNIT_DISTRIBUTION" | /usr/bin/awk '{print $1}')" = d3a56d27b00966319cb0fce66e33d7b889b5ce9a3eb20d784f4e2a2051d55a86
 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I - "$JUNIT_311" "$JUNIT_312" "$JUNIT_DISTRIBUTION" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
@@ -2084,11 +2099,20 @@ falsely green:
 
 ```bash
 set -euo pipefail
-IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-$(git rev-parse --short=12 HEAD)
+PROBE_FULL_SHA=$(git rev-parse HEAD)
+[[ $PROBE_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+PROBE_RUN_SHA=${PROBE_FULL_SHA:0:12}
+[[ $PROBE_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
+IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-${PROBE_RUN_SHA}
 [[ $IMPORT_CANDIDATE =~ ^/private/tmp/cellpose-mcp-import-candidate-[0-9a-f]{12}$ ]]
 export IMPORT_CANDIDATE
-test ! -e "$IMPORT_CANDIDATE"
-git clone --no-hardlinks --local . "$IMPORT_CANDIDATE"
+if test -e "$IMPORT_CANDIDATE"; then
+  test -d "$IMPORT_CANDIDATE" && test ! -L "$IMPORT_CANDIDATE"
+  test "$(git -C "$IMPORT_CANDIDATE" rev-parse HEAD)" = "$PROBE_FULL_SHA"
+  test -z "$(git -C "$IMPORT_CANDIDATE" status --porcelain)"
+else
+  git clone --no-hardlinks --local . "$IMPORT_CANDIDATE"
+fi
 ```
 
 Add only the new test to the candidate with `apply_patch`.
@@ -2101,31 +2125,40 @@ lock, not model hosts or weights.
 
 ```bash
 set -euo pipefail
-IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-$(git rev-parse --short=12 HEAD)
+PROBE_FULL_SHA=$(git rev-parse HEAD)
+[[ $PROBE_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+PROBE_RUN_SHA=${PROBE_FULL_SHA:0:12}
+[[ $PROBE_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
+IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-${PROBE_RUN_SHA}
 [[ $IMPORT_CANDIDATE =~ ^/private/tmp/cellpose-mcp-import-candidate-[0-9a-f]{12}$ ]]
 export IMPORT_CANDIDATE
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$IMPORT_CANDIDATE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_DEV_ENV=/private/tmp/cellpose-mcp-probe-dev-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_PACKAGE_HOME=/private/tmp/cellpose-mcp-probe-package-home-${PROBE_ROOT_LOCK_SHA}
 export PROBE_PACKAGE_TMP=/private/tmp/cellpose-mcp-probe-package-tmp-${PROBE_ROOT_LOCK_SHA}
-test ! -e "$PROBE_DEV_ENV"
-test ! -e "$PROBE_UV_CACHE"
-test ! -e "$PROBE_PACKAGE_HOME"
-test ! -e "$PROBE_PACKAGE_TMP"
-install -d -m 700 "$PROBE_UV_CACHE" "$PROBE_PACKAGE_HOME" "$PROBE_PACKAGE_TMP"
+for private_directory in "$PROBE_UV_CACHE" "$PROBE_PACKAGE_HOME" "$PROBE_PACKAGE_TMP"; do
+  if test -e "$private_directory"; then
+    test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory"
+    test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700
+  else
+    install -d -m 700 "$private_directory"
+  fi
+done
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/bin/uv | /usr/bin/awk '{print $1}')" = "392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" /Users/suraj/.local/bin/uv --version 2>&1)" = "uv 0.10.4 (079e3fd05 2026-02-17)"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --version 2>&1)" = "Python 3.12.12"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_DEV_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$IMPORT_CANDIDATE" sync --project "$IMPORT_CANDIDATE" --frozen --no-build --no-install-project --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+if ! test -e "$PROBE_DEV_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_DEV_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$IMPORT_CANDIDATE" sync --project "$IMPORT_CANDIDATE" --frozen --no-build --no-install-project --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+fi
 PROBE_DEV_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_DEV_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_DEV_SITE == "$PROBE_DEV_ENV"/*/site-packages ]]
 export PROBE_DEV_SITE
-PROBE_DEV_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_DEV_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_DEV_SITE/cellpose_mcp_probe_source.pth" "$IMPORT_CANDIDATE/src")
+PROBE_DEV_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_DEV_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_DEV_SITE/cellpose_mcp_probe_source.pth" "$IMPORT_CANDIDATE/src")
 [[ $PROBE_DEV_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_DEV_PTH_SHA
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_DEV_ENV/bin/python" -B -I -c 'from importlib.util import find_spec; from pathlib import Path; import sys; spec=find_spec("cellpose_mcp"); assert spec is not None and spec.origin is not None; root=Path(spec.origin).resolve(strict=True); expected=Path(sys.argv[1]).resolve(strict=True); assert root.is_relative_to(expected)' "$IMPORT_CANDIDATE/src"
@@ -2145,12 +2178,16 @@ Task 5 use this environment with `--frozen --offline --no-sync`.
 
 ```bash
 set -euo pipefail
-IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-$(git rev-parse --short=12 HEAD)
+PROBE_FULL_SHA=$(git rev-parse HEAD)
+[[ $PROBE_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+PROBE_RUN_SHA=${PROBE_FULL_SHA:0:12}
+[[ $PROBE_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
+IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-${PROBE_RUN_SHA}
 [[ $IMPORT_CANDIDATE =~ ^/private/tmp/cellpose-mcp-import-candidate-[0-9a-f]{12}$ ]]
 export IMPORT_CANDIDATE
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$IMPORT_CANDIDATE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_DEV_ENV=/private/tmp/cellpose-mcp-probe-dev-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -2205,12 +2242,16 @@ No other initializer bytes change.
 
 ```bash
 set -euo pipefail
-IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-$(git rev-parse --short=12 HEAD)
+PROBE_FULL_SHA=$(git rev-parse HEAD)
+[[ $PROBE_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+PROBE_RUN_SHA=${PROBE_FULL_SHA:0:12}
+[[ $PROBE_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
+IMPORT_CANDIDATE=/private/tmp/cellpose-mcp-import-candidate-${PROBE_RUN_SHA}
 [[ $IMPORT_CANDIDATE =~ ^/private/tmp/cellpose-mcp-import-candidate-[0-9a-f]{12}$ ]]
 export IMPORT_CANDIDATE
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$IMPORT_CANDIDATE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_DEV_ENV=/private/tmp/cellpose-mcp-probe-dev-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -2247,24 +2288,25 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_PACKAGE_HOME=/private/tmp/cellpose-mcp-probe-package-home-${PROBE_ROOT_LOCK_SHA}
 export PROBE_PACKAGE_TMP=/private/tmp/cellpose-mcp-probe-package-tmp-${PROBE_ROOT_LOCK_SHA}
-test ! -e "$PROBE_ROOT_ENV"
 test -d "$PROBE_PACKAGE_HOME"
 test -d "$PROBE_PACKAGE_TMP"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/bin/uv | /usr/bin/awk '{print $1}')" = "392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" /Users/suraj/.local/bin/uv --version 2>&1)" = "uv 0.10.4 (079e3fd05 2026-02-17)"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --version 2>&1)" = "Python 3.12.12"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_ROOT_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+if ! test -e "$PROBE_ROOT_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_ROOT_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+fi
 PROBE_ROOT_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_ROOT_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_ROOT_SITE == "$PROBE_ROOT_ENV"/*/site-packages ]]
 export PROBE_ROOT_SITE
-PROBE_ROOT_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_ROOT_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_ROOT_SITE/cellpose_mcp_probe_source.pth" "$PROBE_ROOT/src")
+PROBE_ROOT_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" "$PROBE_ROOT_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_ROOT_SITE/cellpose_mcp_probe_source.pth" "$PROBE_ROOT/src")
 [[ $PROBE_ROOT_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_ROOT_PTH_SHA
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ROOT_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" run --project "$PROBE_ROOT" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev pytest -p no:cacheprovider tests/contract/upstream/test_release_import_isolation.py tests/contract/test_feature_manifest.py tests/packaging/test_distribution_contents.py -v
@@ -2393,7 +2435,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -2495,7 +2537,7 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -2696,7 +2738,7 @@ set -euo pipefail
 PROBE_ROOT=$(pwd -P)
 test "$PROBE_ROOT" = "/Users/suraj/Documents/Tools/cellpose_mcp"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_ROOT/uv.lock" | /usr/bin/awk '{print $1}')
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 PROBE_PACKAGE_HOME=/private/tmp/cellpose-mcp-probe-package-home-${PROBE_ROOT_LOCK_SHA}
@@ -2748,7 +2790,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_ROOT/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
@@ -2799,7 +2841,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_ROOT/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
@@ -2819,8 +2861,6 @@ export PROBE_PACKAGE_HOME
 PROBE_PACKAGE_TMP=/private/tmp/cellpose-mcp-probe-package-tmp-$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_PACKAGE_TMP =~ ^/private/tmp/cellpose-mcp-probe-package-tmp-[0-9a-f]{64}$ ]]
 export PROBE_PACKAGE_TMP
-test ! -e "$CP4_PROBE_ENV"
-test ! -e "$CP3_PROBE_ENV"
 test -d "$PROBE_PACKAGE_HOME"
 test -d "$PROBE_PACKAGE_TMP"
 test -x "$PROBE_ROOT_ENV/bin/python"
@@ -2837,9 +2877,13 @@ test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 | /usr/bin/awk '{print $1}')" = "e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 --version 2>&1)" = "Python 3.11.14"
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_ROOT_ENV/bin/python" -B -I -c 'from pathlib import Path; from cellpose_mcp.release.upstream_evidence import validate_transitive_lock_sources; validate_transitive_lock_sources(Path("probes/upstream/cp4/uv.lock"), excluded_project_name="cellpose-mcp-cp4-contract-probe")'
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$CP4_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT/probes/upstream/cp4" --frozen --no-build --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12
+if ! test -e "$CP4_PROBE_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$CP4_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT/probes/upstream/cp4" --frozen --no-build --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12
+fi
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_ROOT_ENV/bin/python" -B -I -c 'from pathlib import Path; from cellpose_mcp.release.upstream_evidence import validate_transitive_lock_sources; validate_transitive_lock_sources(Path("probes/upstream/cp3/uv.lock"), excluded_project_name="cellpose-mcp-cp3-contract-probe")'
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$CP3_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT/probes/upstream/cp3" --frozen --no-build --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11
+if ! test -e "$CP3_PROBE_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" UV_PROJECT_ENVIRONMENT="$CP3_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" sync --project "$PROBE_ROOT/probes/upstream/cp3" --frozen --no-build --no-python-downloads --no-config --default-index https://pypi.org/simple --keyring-provider disabled --python /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11
+fi
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$CP4_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" run --project "$PROBE_ROOT/probes/upstream/cp4" --frozen --offline --no-sync --no-python-downloads --no-config python -B -I -c 'import importlib.metadata; assert importlib.metadata.version("cellpose") == "4.2.1.1"'
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_PACKAGE_HOME" TMPDIR="$PROBE_PACKAGE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$CP3_PROBE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ROOT" run --project "$PROBE_ROOT/probes/upstream/cp3" --frozen --offline --no-sync --no-python-downloads --no-config python -B -I -c 'import importlib.metadata; assert importlib.metadata.version("cellpose") == "3.1.1.3"'
 PROBE_ROOT_PTH_SHA_AFTER=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_ROOT_PTH" "$PROBE_ROOT/src")
@@ -2865,7 +2909,7 @@ PROBE_COMMIT_SUBJECT="build: add isolated Cellpose probe locks"
 PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_ROOT/uv.lock" | /usr/bin/awk '{print $1}')
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_ROOT_ENV
 PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -3188,7 +3232,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -3421,7 +3465,7 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -3547,7 +3591,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -3656,14 +3700,16 @@ The CP4 diameter fixture calls the same unbound eval four times and records:
 The CP3 combined stub records top-level arity four and verifies the fourth
 item is the exact fake restored-array object returned by the fake denoiser.
 
-- [ ] **Step 5: Run both real pinned probes offline to temporary stdout**
+- [ ] **Step 5: Run both real pinned probes offline to retained scratch reports**
 
 ```bash
 set -euo pipefail
 PROBE_ROOT=$(pwd -P)
 [[ $PROBE_ROOT == /* && -d "$PROBE_ROOT" ]]
 export PROBE_ROOT
-PROBE_RUN_SHA=$(git rev-parse --short=12 HEAD)
+PROBE_FULL_SHA=$(git rev-parse HEAD)
+[[ $PROBE_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+PROBE_RUN_SHA=${PROBE_FULL_SHA:0:12}
 [[ $PROBE_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
 export PROBE_RUN_SHA
 PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
@@ -3679,19 +3725,78 @@ export CP4_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp4-${CP4_LOCK_SHA}
 export CP3_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp3-${CP3_LOCK_SHA}
 export CP4_SCRATCH=/private/tmp/cellpose-mcp-probe-cp4-smoke-${PROBE_RUN_SHA}-${CP4_LOCK_SHA}
 export CP3_SCRATCH=/private/tmp/cellpose-mcp-probe-cp3-smoke-${PROBE_RUN_SHA}-${CP3_LOCK_SHA}
-test ! -e "$CP4_SCRATCH"
-test ! -e "$CP3_SCRATCH"
-install -d -m 700 "$CP4_SCRATCH" "$CP4_SCRATCH/home" "$CP4_SCRATCH/models" "$CP4_SCRATCH/torch" "$CP4_SCRATCH/xdg" "$CP4_SCRATCH/mpl" "$CP4_SCRATCH/numba" "$CP4_SCRATCH/tmp"
-install -d -m 700 "$CP3_SCRATCH" "$CP3_SCRATCH/home" "$CP3_SCRATCH/models" "$CP3_SCRATCH/torch" "$CP3_SCRATCH/xdg" "$CP3_SCRATCH/mpl" "$CP3_SCRATCH/numba" "$CP3_SCRATCH/tmp"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$CP4_SCRATCH/home" CELLPOSE_LOCAL_MODELS_PATH="$CP4_SCRATCH/models" TORCH_HOME="$CP4_SCRATCH/torch" XDG_CACHE_HOME="$CP4_SCRATCH/xdg" MPLCONFIGDIR="$CP4_SCRATCH/mpl" NUMBA_CACHE_DIR="$CP4_SCRATCH/numba" TMPDIR="$CP4_SCRATCH/tmp" UV_CACHE_DIR="$PROBE_UV_CACHE" VIRTUAL_ENV="$CP4_PROBE_ENV" UV_PROJECT_ENVIRONMENT="$CP4_PROBE_ENV" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 "$CP4_PROBE_ENV/bin/python" -B -I -S "$PROBE_ROOT/scripts/probe_cellpose_runtime.py" --contract "$PROBE_ROOT/probes/upstream/cp4/contract.toml" --output -
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$CP3_SCRATCH/home" CELLPOSE_LOCAL_MODELS_PATH="$CP3_SCRATCH/models" TORCH_HOME="$CP3_SCRATCH/torch" XDG_CACHE_HOME="$CP3_SCRATCH/xdg" MPLCONFIGDIR="$CP3_SCRATCH/mpl" NUMBA_CACHE_DIR="$CP3_SCRATCH/numba" TMPDIR="$CP3_SCRATCH/tmp" UV_CACHE_DIR="$PROBE_UV_CACHE" VIRTUAL_ENV="$CP3_PROBE_ENV" UV_PROJECT_ENVIRONMENT="$CP3_PROBE_ENV" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 "$CP3_PROBE_ENV/bin/python" -B -I -S "$PROBE_ROOT/scripts/probe_cellpose_runtime.py" --contract "$PROBE_ROOT/probes/upstream/cp3/contract.toml" --output -
+prepare_scratch() {
+  local scratch_root=$1
+  if test -e "$scratch_root"; then
+    test -d "$scratch_root" && test ! -L "$scratch_root" && test -O "$scratch_root"
+    test "$(/usr/bin/stat -f '%Lp' "$scratch_root")" = 700
+  else
+    install -d -m 700 "$scratch_root"
+  fi
+  for scratch_child in home models torch xdg mpl numba tmp; do
+    if test -e "$scratch_root/$scratch_child"; then
+      test -d "$scratch_root/$scratch_child" && test ! -L "$scratch_root/$scratch_child" && test -O "$scratch_root/$scratch_child"
+      test "$(/usr/bin/stat -f '%Lp' "$scratch_root/$scratch_child")" = 700
+    else
+      install -d -m 700 "$scratch_root/$scratch_child"
+    fi
+  done
+}
+prepare_scratch "$CP4_SCRATCH"
+prepare_scratch "$CP3_SCRATCH"
+CP4_SCRATCH_REPORT="$CP4_SCRATCH/cp4-probe-stdout.json"
+CP3_SCRATCH_REPORT="$CP3_SCRATCH/cp3-probe-stdout.json"
+run_or_reuse_probe() {
+  local runtime_name=$1 scratch_root=$2 environment=$3 contract=$4 report=$5 approved_python=$6
+  local probe_source_sha contract_sha
+  probe_source_sha=$(/usr/bin/shasum -a 256 "$PROBE_ROOT/scripts/probe_cellpose_runtime.py" | /usr/bin/awk '{print $1}')
+  contract_sha=$(/usr/bin/shasum -a 256 "$contract" | /usr/bin/awk '{print $1}')
+  if test -e "$report"; then
+    test -f "$report" && test ! -L "$report" && test -O "$report"
+    test "$(/usr/bin/stat -f '%Lp' "$report")" = 600
+  else
+    /usr/bin/install -m 600 /dev/null "$report"
+    set +e
+    /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$scratch_root/home" CELLPOSE_LOCAL_MODELS_PATH="$scratch_root/models" TORCH_HOME="$scratch_root/torch" XDG_CACHE_HOME="$scratch_root/xdg" MPLCONFIGDIR="$scratch_root/mpl" NUMBA_CACHE_DIR="$scratch_root/numba" TMPDIR="$scratch_root/tmp" UV_CACHE_DIR="$PROBE_UV_CACHE" VIRTUAL_ENV="$environment" UV_PROJECT_ENVIRONMENT="$environment" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 "$environment/bin/python" -B -I -S "$PROBE_ROOT/scripts/probe_cellpose_runtime.py" --contract "$contract" --output - >"$report"
+    probe_status=$?
+    set -e
+    case $probe_status in 0|2|3) ;; *) echo "undocumented $runtime_name probe status: $probe_status" >&2; return 1 ;; esac
+  fi
+  test -f "$report" && test ! -L "$report" && test -O "$report"
+  test "$(/usr/bin/stat -f '%Lp' "$report")" = 600
+  test "$(/usr/bin/shasum -a 256 "$PROBE_ROOT/scripts/probe_cellpose_runtime.py" | /usr/bin/awk '{print $1}')" = "$probe_source_sha"
+  test "$(/usr/bin/shasum -a 256 "$contract" | /usr/bin/awk '{print $1}')" = "$contract_sha"
+  test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$environment/bin/python")" = "$approved_python"
+  "$environment/bin/python" -B -I -S - "$runtime_name" "$report" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+runtime, report_path = sys.argv[1:]
+document = json.loads(Path(report_path).read_text(encoding="utf-8"))
+assert document["outcome"] in {"PASS", "FAIL"}
+print(f'{runtime}: outcome={document["outcome"]}; report={report_path}')
+PY
+}
+run_or_reuse_probe cp4 "$CP4_SCRATCH" "$CP4_PROBE_ENV" "$PROBE_ROOT/probes/upstream/cp4/contract.toml" "$CP4_SCRATCH_REPORT" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12
+run_or_reuse_probe cp3 "$CP3_SCRATCH" "$CP3_PROBE_ENV" "$PROBE_ROOT/probes/upstream/cp3/contract.toml" "$CP3_SCRATCH_REPORT" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11
+"$CP4_PROBE_ENV/bin/python" -B -I -S - "$CP4_SCRATCH_REPORT" "$CP3_SCRATCH_REPORT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+statuses = [json.loads(Path(item).read_text(encoding="utf-8"))["outcome"] for item in sys.argv[1:]]
+assert statuses == ["PASS", "PASS"], statuses
+PY
 ```
 
-Expected: both exit 0, every required check passes, every guard counter is
+Expected: both recorded statuses are 0/PASS, every required check passes, every guard counter is
 zero, the model-directory before/after hashes match, user site is disabled,
 and repository paths are absent from probe `sys.path`. If either environment
-tries to create a model/cache file, connect, or load/save a checkpoint, stop
-and preserve the FAIL report.
+tries to create a model/cache file, connect, or load/save a checkpoint, its
+status-2/3 canonical FAIL JSON remains at the mode-0600 scratch path, is parsed
+and summarized, the other runtime is still captured independently, and the
+final PASS assertion stops the task without deleting either report.
 
 - [ ] **Step 6: Run GREEN and commit expectations**
 
@@ -3711,7 +3816,7 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -4230,7 +4335,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -4534,7 +4639,7 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -4575,6 +4680,16 @@ wheel/sdist sets must now contain both upstream modules and no extra file.
 **Files:** Temporary reports under `/private/tmp`; no repository file until
 Task 8.
 
+**Recovery invariant:** Every clone, controller, HOME/TMP, runtime,
+provisioning root, output directory, JSON report, and detached digest below is
+independently gated. An absent unit may be created. An existing unit is reused
+only after its complete type/owner/mode, commit/lock/interpreter, PTH,
+report-schema/digest, command/source, and clean-status checks pass. A partial
+pair (JSON without its digest, PTH without its exact payload, environment
+without its canonical interpreter, or one shared CP4/CP3 provisioning tree)
+is ambiguous and stops. CP4 and CP3 are never provisioned by one paired
+freshness gate. Evidence is never deleted or overwritten for recovery.
+
 - [ ] **Step 1: Prove the implementation commit is clean and create a clone**
 
 ```bash
@@ -4584,9 +4699,12 @@ PROBE_IMPLEMENTATION_SHA=$(git rev-parse HEAD)
 [[ $PROBE_IMPLEMENTATION_SHA =~ ^[0-9a-f]{40}$ ]]
 export PROBE_IMPLEMENTATION_SHA
 export PROBE_CLONE=/private/tmp/cellpose-mcp-probe-clean-${PROBE_IMPLEMENTATION_SHA}
-test ! -e "$PROBE_CLONE"
-git clone --no-hardlinks --local . "$PROBE_CLONE"
-git -C "$PROBE_CLONE" checkout --detach "$PROBE_IMPLEMENTATION_SHA"
+if test -e "$PROBE_CLONE"; then
+  test -d "$PROBE_CLONE" && test ! -L "$PROBE_CLONE"
+else
+  git clone --no-hardlinks --local --no-checkout . "$PROBE_CLONE"
+  git -C "$PROBE_CLONE" checkout --detach "$PROBE_IMPLEMENTATION_SHA"
+fi
 test "$(git -C "$PROBE_CLONE" rev-parse HEAD)" = "$PROBE_IMPLEMENTATION_SHA"
 test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
@@ -4608,7 +4726,7 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
@@ -4622,21 +4740,25 @@ CP3_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64
 export CP3_LOCK_SHA
 export CP4_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp4-${PROBE_IMPLEMENTATION_SHA}-${CP4_LOCK_SHA}
 export CP3_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp3-${PROBE_IMPLEMENTATION_SHA}-${CP3_LOCK_SHA}
-test ! -e "$PROBE_CONTROLLER_ENV"
-test ! -e "$PROBE_CONTROLLER_HOME"
-test ! -e "$PROBE_CONTROLLER_TMP"
-test ! -e "$CP4_PROBE_ENV"
-test ! -e "$CP3_PROBE_ENV"
-install -d -m 700 "$PROBE_CONTROLLER_HOME" "$PROBE_CONTROLLER_TMP"
+for private_directory in "$PROBE_CONTROLLER_HOME" "$PROBE_CONTROLLER_TMP"; do
+  if test -e "$private_directory"; then
+    test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory"
+    test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700
+  else
+    install -d -m 700 "$private_directory"
+  fi
+done
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/bin/uv | /usr/bin/awk '{print $1}')" = "392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" /Users/suraj/.local/bin/uv --version 2>&1)" = "uv 0.10.4 (079e3fd05 2026-02-17)"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --version 2>&1)" = "Python 3.12.12"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_CONTROLLER_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_CLONE" sync --project "$PROBE_CLONE" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+if ! test -e "$PROBE_CONTROLLER_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_CONTROLLER_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_CLONE" sync --project "$PROBE_CLONE" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+fi
 PROBE_CONTROLLER_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_CONTROLLER_SITE == "$PROBE_CONTROLLER_ENV"/*/site-packages ]]
 export PROBE_CONTROLLER_SITE
-PROBE_CONTROLLER_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_CONTROLLER_SITE/cellpose_mcp_probe_source.pth" "$PROBE_CLONE/src")
+PROBE_CONTROLLER_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_CONTROLLER_SITE/cellpose_mcp_probe_source.pth" "$PROBE_CLONE/src")
 [[ $PROBE_CONTROLLER_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_CONTROLLER_PTH_SHA
 test -x "$PROBE_CONTROLLER_ENV/bin/python"
@@ -4664,7 +4786,7 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
@@ -4680,7 +4802,7 @@ test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLL
 PROBE_CONTROLLER_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_CONTROLLER_SITE == "$PROBE_CONTROLLER_ENV"/*/site-packages ]]
 export PROBE_CONTROLLER_SITE
-PROBE_CONTROLLER_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_CONTROLLER_SITE/cellpose_mcp_probe_source.pth" "$PROBE_CLONE/src")
+PROBE_CONTROLLER_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_CONTROLLER_SITE/cellpose_mcp_probe_source.pth" "$PROBE_CLONE/src")
 [[ $PROBE_CONTROLLER_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_CONTROLLER_PTH_SHA
 ```
@@ -4704,7 +4826,7 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,sys; print(hashlib.sha256((Path(sys.argv[1])/"uv.lock").read_bytes()).hexdigest())' "$PROBE_CLONE")
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
@@ -4719,29 +4841,69 @@ export CP3_LOCK_SHA
 export CP4_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp4-${PROBE_IMPLEMENTATION_SHA}-${CP4_LOCK_SHA}
 export CP3_PROBE_ENV=/private/tmp/cellpose-mcp-probe-cp3-${PROBE_IMPLEMENTATION_SHA}-${CP3_LOCK_SHA}
 export PROBE_OUTPUT=/private/tmp/cellpose-mcp-probe-output-${PROBE_IMPLEMENTATION_SHA}
-test ! -e "$PROBE_OUTPUT"
-install -d -m 700 "$PROBE_OUTPUT"
-test ! -e "$PROBE_OUTPUT/cp4-4.2.1.1-contract.json"
-test ! -e "$PROBE_OUTPUT/cp4-4.2.1.1-contract.json.sha256"
-test ! -e "$PROBE_OUTPUT/cp3-3.1.1.3-contract.json"
-test ! -e "$PROBE_OUTPUT/cp3-3.1.1.3-contract.json.sha256"
 test -d "$PROBE_CONTROLLER_HOME"
 test -d "$PROBE_CONTROLLER_TMP"
-test "$(/usr/bin/readlink "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
+test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_CONTROLLER_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
+if test -e "$PROBE_OUTPUT"; then
+  test -d "$PROBE_OUTPUT" && test ! -L "$PROBE_OUTPUT" && test -O "$PROBE_OUTPUT"
+  test "$(/usr/bin/stat -f '%Lp' "$PROBE_OUTPUT")" = 700
+else
+  install -d -m 700 "$PROBE_OUTPUT"
+fi
 PROBE_CONTROLLER_PTH="$PROBE_CONTROLLER_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth"
 PROBE_CONTROLLER_PTH_SHA_BEFORE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'from pathlib import Path; import hashlib,os,stat,sys; assert sys.flags.no_site==1 and "site" not in sys.modules; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_CONTROLLER_PTH" "$PROBE_CLONE/src")
 [[ $PROBE_CONTROLLER_PTH_SHA_BEFORE =~ ^[0-9a-f]{64}$ ]]
 CP4_PROVISIONING_ROOT=/private/tmp/cellpose-mcp-probe-provisioning-${PROBE_IMPLEMENTATION_SHA}-cp4
 CP3_PROVISIONING_ROOT=/private/tmp/cellpose-mcp-probe-provisioning-${PROBE_IMPLEMENTATION_SHA}-cp3
-test ! -e "$CP4_PROVISIONING_ROOT"
-test ! -e "$CP3_PROVISIONING_ROOT"
 cd "$PROBE_CLONE"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S "$PROBE_CLONE/scripts/generate_upstream_contract_evidence.py" contract --runtime cp4 --environment "$CP4_PROBE_ENV" --cache "$PROBE_UV_CACHE" --provisioning-home "$CP4_PROVISIONING_ROOT/home" --provisioning-tmp "$CP4_PROVISIONING_ROOT/tmp" --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --uv /Users/suraj/.local/bin/uv --output "$PROBE_OUTPUT/cp4-4.2.1.1-contract.json"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S "$PROBE_CLONE/scripts/generate_upstream_contract_evidence.py" contract --runtime cp3 --environment "$CP3_PROBE_ENV" --cache "$PROBE_UV_CACHE" --provisioning-home "$CP3_PROVISIONING_ROOT/home" --provisioning-tmp "$CP3_PROVISIONING_ROOT/tmp" --python /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 --uv /Users/suraj/.local/bin/uv --output "$PROBE_OUTPUT/cp3-3.1.1.3-contract.json"
+run_or_reuse_contract() {
+  local runtime_name=$1 environment=$2 provisioning_root=$3 runtime_python=$4 report=$5
+  local digest="${report}.sha256"
+  local generator_sha
+  generator_sha=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/scripts/generate_upstream_contract_evidence.py" | /usr/bin/awk '{print $1}') || return 1
+  if test -e "$report" || test -e "$digest" || test -e "$provisioning_root" || test -e "$environment"; then
+    test -f "$report" && test ! -L "$report" && test -O "$report" && test -f "$digest" && test ! -L "$digest" && test -O "$digest" || return 1
+    test -d "$provisioning_root" && test ! -L "$provisioning_root" && test -O "$provisioning_root" || return 1
+    test -d "$environment" && test ! -L "$environment" && test -O "$environment" && test -x "$environment/bin/python" || return 1
+    test "$(/usr/bin/shasum -a 256 "$report" | /usr/bin/awk '{print $1}')  $(/usr/bin/basename "$report")" = "$(/bin/cat "$digest")" || return 1
+    contract_status=$("$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'import json,sys; from pathlib import Path; print(0 if json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["outcome"] == "PASS" else 2)' "$report") || return 1
+  else
+    /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S "$PROBE_CLONE/scripts/generate_upstream_contract_evidence.py" contract --runtime "$runtime_name" --environment "$environment" --cache "$PROBE_UV_CACHE" --provisioning-home "$provisioning_root/home" --provisioning-tmp "$provisioning_root/tmp" --python "$runtime_python" --uv /Users/suraj/.local/bin/uv --output "$report"
+    contract_status=$?
+    case $contract_status in 0|2|3) ;; *) echo "undocumented generator status: $contract_status" >&2; return 1 ;; esac
+  fi
+  test -f "$report" && test ! -L "$report" && test -O "$report" && test -f "$digest" && test ! -L "$digest" && test -O "$digest" || return 1
+  test "$(/usr/bin/shasum -a 256 "$report" | /usr/bin/awk '{print $1}')  $(/usr/bin/basename "$report")" = "$(/bin/cat "$digest")" || return 1
+  test "$(/usr/bin/shasum -a 256 "$PROBE_CLONE/scripts/generate_upstream_contract_evidence.py" | /usr/bin/awk '{print $1}')" = "$generator_sha" || return 1
+  test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$environment/bin/python")" = "$runtime_python" || return 1
+  "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S - "$runtime_name" "$PROBE_IMPLEMENTATION_SHA" "$report" <<'PY' || return 1
+import json
+import sys
+from pathlib import Path
+
+runtime, commit_sha, report_path = sys.argv[1:]
+document = json.loads(Path(report_path).read_text(encoding="utf-8"))
+assert document["outcome"] in {"PASS", "FAIL"}
+assert document["runtime"]["runtime_id"] == runtime
+assert document["product"]["commit_sha"] == commit_sha
+print(f'{runtime}: outcome={document["outcome"]}; report={report_path}')
+PY
+  return "$contract_status"
+}
+set +e
+run_or_reuse_contract cp4 "$CP4_PROBE_ENV" "$CP4_PROVISIONING_ROOT" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 "$PROBE_OUTPUT/cp4-4.2.1.1-contract.json"
+CP4_GENERATOR_STATUS=$?
+run_or_reuse_contract cp3 "$CP3_PROBE_ENV" "$CP3_PROVISIONING_ROOT" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 "$PROBE_OUTPUT/cp3-3.1.1.3-contract.json"
+CP3_GENERATOR_STATUS=$?
+set -e
+case $CP4_GENERATOR_STATUS in 0|2|3) ;; *) exit "$CP4_GENERATOR_STATUS" ;; esac
+case $CP3_GENERATOR_STATUS in 0|2|3) ;; *) exit "$CP3_GENERATOR_STATUS" ;; esac
 PROBE_CONTROLLER_PTH_SHA_AFTER=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'from pathlib import Path; import hashlib,os,stat,sys; assert sys.flags.no_site==1 and "site" not in sys.modules; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_CONTROLLER_PTH" "$PROBE_CLONE/src")
 test "$PROBE_CONTROLLER_PTH_SHA_AFTER" = "$PROBE_CONTROLLER_PTH_SHA_BEFORE"
+test "$CP4_GENERATOR_STATUS" -eq 0
+test "$CP3_GENERATOR_STATUS" -eq 0
 ```
 
 For each sanitized direct-controller call, the runner first creates the absent
@@ -4764,7 +4926,7 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
@@ -4773,7 +4935,7 @@ export PROBE_CONTROLLER_HOME=/private/tmp/cellpose-mcp-probe-controller-home-${P
 export PROBE_CONTROLLER_TMP=/private/tmp/cellpose-mcp-probe-controller-tmp-${PROBE_IMPLEMENTATION_SHA}
 test -d "$PROBE_CONTROLLER_HOME"
 test -d "$PROBE_CONTROLLER_TMP"
-test "$(/usr/bin/readlink "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
+test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_CONTROLLER_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
 PROBE_CONTROLLER_PTH="$PROBE_CONTROLLER_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth"
@@ -4812,27 +4974,52 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
 export PROBE_CONTROLLER_HOME=/private/tmp/cellpose-mcp-probe-controller-home-${PROBE_IMPLEMENTATION_SHA}
 export PROBE_CONTROLLER_TMP=/private/tmp/cellpose-mcp-probe-controller-tmp-${PROBE_IMPLEMENTATION_SHA}
 export PROBE_OUTPUT=/private/tmp/cellpose-mcp-probe-output-${PROBE_IMPLEMENTATION_SHA}
-test ! -e "$PROBE_OUTPUT/cellpose-stable-release-check.json"
-test ! -e "$PROBE_OUTPUT/cellpose-stable-release-check.json.sha256"
 test -d "$PROBE_CONTROLLER_HOME"
 test -d "$PROBE_CONTROLLER_TMP"
-test "$(/usr/bin/readlink "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
+test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_CONTROLLER_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
 PROBE_CONTROLLER_PTH="$PROBE_CONTROLLER_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth"
 PROBE_CONTROLLER_PTH_SHA_BEFORE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'from pathlib import Path; import hashlib,os,stat,sys; assert sys.flags.no_site==1 and "site" not in sys.modules; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_CONTROLLER_PTH" "$PROBE_CLONE/src")
 [[ $PROBE_CONTROLLER_PTH_SHA_BEFORE =~ ^[0-9a-f]{64}$ ]]
 cd "$PROBE_CLONE"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S "$PROBE_CLONE/scripts/generate_cellpose_stable_release_check.py" --cp4-version 4.2.1.1 --cp3-version 3.1.1.3 --output "$PROBE_OUTPUT/cellpose-stable-release-check.json"
+STABLE_REPORT="$PROBE_OUTPUT/cellpose-stable-release-check.json"
+STABLE_DIGEST="${STABLE_REPORT}.sha256"
+STABLE_GENERATOR_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/scripts/generate_cellpose_stable_release_check.py" | /usr/bin/awk '{print $1}')
+if test -e "$STABLE_REPORT" || test -e "$STABLE_DIGEST"; then
+  test -f "$STABLE_REPORT" && test ! -L "$STABLE_REPORT" && test -O "$STABLE_REPORT" && test -f "$STABLE_DIGEST" && test ! -L "$STABLE_DIGEST" && test -O "$STABLE_DIGEST"
+  STABLE_STATUS=$("$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'import json,sys; from pathlib import Path; print(0 if json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["outcome"] == "PASS" else 2)' "$STABLE_REPORT")
+else
+  set +e
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S "$PROBE_CLONE/scripts/generate_cellpose_stable_release_check.py" --cp4-version 4.2.1.1 --cp3-version 3.1.1.3 --output "$STABLE_REPORT"
+  STABLE_STATUS=$?
+  set -e
+  case $STABLE_STATUS in 0|2) ;; *) echo "undocumented stable-policy status: $STABLE_STATUS" >&2; exit 1 ;; esac
+fi
+test -f "$STABLE_REPORT" && test ! -L "$STABLE_REPORT" && test -O "$STABLE_REPORT" && test -f "$STABLE_DIGEST" && test ! -L "$STABLE_DIGEST" && test -O "$STABLE_DIGEST"
+test "$(/usr/bin/shasum -a 256 "$STABLE_REPORT" | /usr/bin/awk '{print $1}')  $(/usr/bin/basename "$STABLE_REPORT")" = "$(/bin/cat "$STABLE_DIGEST")"
+test "$(/usr/bin/shasum -a 256 "$PROBE_CLONE/scripts/generate_cellpose_stable_release_check.py" | /usr/bin/awk '{print $1}')" = "$STABLE_GENERATOR_SHA"
+"$PROBE_CONTROLLER_ENV/bin/python" -B -I -S - "$PROBE_IMPLEMENTATION_SHA" "$STABLE_REPORT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+commit_sha, report_path = sys.argv[1:]
+document = json.loads(Path(report_path).read_text(encoding="utf-8"))
+assert document["outcome"] in {"PASS", "FAIL"}
+assert document["product"]["commit_sha"] == commit_sha
+print(f'stable-policy: outcome={document["outcome"]}; report={report_path}')
+PY
 PROBE_CONTROLLER_PTH_SHA_AFTER=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" -B -I -S -c 'from pathlib import Path; import hashlib,os,stat,sys; assert sys.flags.no_site==1 and "site" not in sys.modules; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_CONTROLLER_PTH" "$PROBE_CLONE/src")
 test "$PROBE_CONTROLLER_PTH_SHA_AFTER" = "$PROBE_CONTROLLER_PTH_SHA_BEFORE"
+test "$STABLE_STATUS" -eq 0
 ```
 
 The direct child metadata script is intentionally network-capable under the
@@ -4859,7 +5046,7 @@ test -z "$(git -C "$PROBE_CLONE" branch --show-current)"
 test -z "$(git -C "$PROBE_CLONE" status --porcelain)"
 PROBE_ROOT_LOCK_SHA=$(/usr/bin/shasum -a 256 "$PROBE_CLONE/uv.lock" | /usr/bin/awk '{print $1}')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
 export PROBE_CONTROLLER_ENV=/private/tmp/cellpose-mcp-probe-controller-${PROBE_IMPLEMENTATION_SHA}
@@ -4868,7 +5055,7 @@ export PROBE_CONTROLLER_HOME=/private/tmp/cellpose-mcp-probe-controller-home-${P
 export PROBE_CONTROLLER_TMP=/private/tmp/cellpose-mcp-probe-controller-tmp-${PROBE_IMPLEMENTATION_SHA}
 test -d "$PROBE_CONTROLLER_HOME"
 test -d "$PROBE_CONTROLLER_TMP"
-test "$(/usr/bin/readlink "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
+test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_CONTROLLER_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_CONTROLLER_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_CONTROLLER_HOME" TMPDIR="$PROBE_CONTROLLER_TMP" "$PROBE_CONTROLLER_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
 PROBE_CONTROLLER_PTH="$PROBE_CONTROLLER_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth"
@@ -4953,7 +5140,7 @@ PROBE_ROOT=$(pwd -P)
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -5038,7 +5225,7 @@ PROBE_REVIEWED_SHA256=$(/usr/bin/shasum -a 256 "${PROBE_COMMIT_PATHS[@]}")
 export PROBE_ROOT
 PROBE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib; print(hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest())')
 [[ $PROBE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ROOT_LOCK_SHA
 export PROBE_ROOT_ENV=/private/tmp/cellpose-mcp-probe-root-${PROBE_ROOT_LOCK_SHA}
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ROOT_LOCK_SHA}
@@ -5085,6 +5272,13 @@ second commit.
 
 **Files:** No repository files.
 
+The Task 6 recovery invariant applies unchanged: acceptance and reproduction
+clones, controller environments, PTH bindings, outputs, and each CP4/CP3
+runtime/provisioning unit are created only when absent. Complete existing
+units are validated and reused; partial or mismatched units stop without
+cleanup. Generator status capture and mandatory executable/source/PTH/output
+after-checks remain in force during reproduction.
+
 - [ ] **Step 1: Clone the evidence commit locally**
 
 ```bash
@@ -5093,9 +5287,12 @@ PROBE_ACCEPTANCE_SHA=$(git rev-parse HEAD)
 [[ $PROBE_ACCEPTANCE_SHA =~ ^[0-9a-f]{40}$ ]]
 export PROBE_ACCEPTANCE_SHA
 export PROBE_ACCEPTANCE=/private/tmp/cellpose-mcp-probe-acceptance-${PROBE_ACCEPTANCE_SHA}
-test ! -e "$PROBE_ACCEPTANCE"
-git clone --no-hardlinks --local --no-checkout . "$PROBE_ACCEPTANCE"
-git -C "$PROBE_ACCEPTANCE" checkout --detach "$PROBE_ACCEPTANCE_SHA"
+if test -e "$PROBE_ACCEPTANCE"; then
+  test -d "$PROBE_ACCEPTANCE" && test ! -L "$PROBE_ACCEPTANCE"
+else
+  git clone --no-hardlinks --local --no-checkout . "$PROBE_ACCEPTANCE"
+  git -C "$PROBE_ACCEPTANCE" checkout --detach "$PROBE_ACCEPTANCE_SHA"
+fi
 test "$(git -C "$PROBE_ACCEPTANCE" rev-parse HEAD)" = "$PROBE_ACCEPTANCE_SHA"
 test -z "$(git -C "$PROBE_ACCEPTANCE" branch --show-current)"
 test -z "$(git -C "$PROBE_ACCEPTANCE" status --porcelain)"
@@ -5119,30 +5316,36 @@ test -z "$(git -C "$PROBE_ACCEPTANCE" branch --show-current)"
 test -z "$(git -C "$PROBE_ACCEPTANCE" status --porcelain)"
 PROBE_ACCEPTANCE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,sys; print(hashlib.sha256((Path(sys.argv[1])/"uv.lock").read_bytes()).hexdigest())' "$PROBE_ACCEPTANCE")
 [[ $PROBE_ACCEPTANCE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ACCEPTANCE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ACCEPTANCE_ROOT_LOCK_SHA}
 export PROBE_ACCEPTANCE_ENV=/private/tmp/cellpose-mcp-probe-acceptance-controller-${PROBE_ACCEPTANCE_SHA}
 export PROBE_ACCEPTANCE_HOME=/private/tmp/cellpose-mcp-probe-acceptance-home-${PROBE_ACCEPTANCE_SHA}
 export PROBE_ACCEPTANCE_TMP=/private/tmp/cellpose-mcp-probe-acceptance-tmp-${PROBE_ACCEPTANCE_SHA}
-test ! -e "$PROBE_ACCEPTANCE_ENV"
-test ! -e "$PROBE_ACCEPTANCE_HOME"
-test ! -e "$PROBE_ACCEPTANCE_TMP"
-install -d -m 700 "$PROBE_ACCEPTANCE_HOME" "$PROBE_ACCEPTANCE_TMP"
+for private_directory in "$PROBE_ACCEPTANCE_HOME" "$PROBE_ACCEPTANCE_TMP"; do
+  if test -e "$private_directory"; then
+    test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory"
+    test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700
+  else
+    install -d -m 700 "$private_directory"
+  fi
+done
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/bin/uv | /usr/bin/awk '{print $1}')" = "392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" /Users/suraj/.local/bin/uv --version 2>&1)" = "uv 0.10.4 (079e3fd05 2026-02-17)"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --version 2>&1)" = "Python 3.12.12"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 | /usr/bin/awk '{print $1}')" = "e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 --version 2>&1)" = "Python 3.11.14"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" sync --project "$PROBE_ACCEPTANCE" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+if ! test -e "$PROBE_ACCEPTANCE_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" sync --project "$PROBE_ACCEPTANCE" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+fi
 test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_ACCEPTANCE_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_ACCEPTANCE_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" "$PROBE_ACCEPTANCE_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
 PROBE_ACCEPTANCE_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" "$PROBE_ACCEPTANCE_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_ACCEPTANCE_SITE == "$PROBE_ACCEPTANCE_ENV"/*/site-packages ]]
 export PROBE_ACCEPTANCE_SITE
-PROBE_ACCEPTANCE_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" "$PROBE_ACCEPTANCE_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_ACCEPTANCE_SITE/cellpose_mcp_probe_source.pth" "$PROBE_ACCEPTANCE/src")
+PROBE_ACCEPTANCE_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" "$PROBE_ACCEPTANCE_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_ACCEPTANCE_SITE/cellpose_mcp_probe_source.pth" "$PROBE_ACCEPTANCE/src")
 [[ $PROBE_ACCEPTANCE_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_ACCEPTANCE_PTH_SHA
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" run --project "$PROBE_ACCEPTANCE" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev python -B -I scripts/check_upstream_contract_evidence.py --root docs/evidence/upstream --require-all
@@ -5171,7 +5374,7 @@ test -z "$(git -C "$PROBE_ACCEPTANCE" branch --show-current)"
 test -z "$(git -C "$PROBE_ACCEPTANCE" status --porcelain)"
 PROBE_ACCEPTANCE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,sys; print(hashlib.sha256((Path(sys.argv[1])/"uv.lock").read_bytes()).hexdigest())' "$PROBE_ACCEPTANCE")
 [[ $PROBE_ACCEPTANCE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ACCEPTANCE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ACCEPTANCE_ROOT_LOCK_SHA}
 export PROBE_ACCEPTANCE_ENV=/private/tmp/cellpose-mcp-probe-acceptance-controller-${PROBE_ACCEPTANCE_SHA}
@@ -5196,18 +5399,24 @@ export PROBE_REPRO_ENV=/private/tmp/cellpose-mcp-probe-reproduction-controller-$
 export PROBE_REPRO_HOME=/private/tmp/cellpose-mcp-probe-reproduction-home-${PROBE_REPRO_SHA}
 export PROBE_REPRO_TMP=/private/tmp/cellpose-mcp-probe-reproduction-tmp-${PROBE_REPRO_SHA}
 export PROBE_REPRO_OUTPUT=/private/tmp/cellpose-mcp-probe-reproduction-output-${PROBE_REPRO_SHA}
-test ! -e "$PROBE_REPRO"
-test ! -e "$PROBE_REPRO_ENV"
-test ! -e "$PROBE_REPRO_HOME"
-test ! -e "$PROBE_REPRO_TMP"
-test ! -e "$PROBE_REPRO_OUTPUT"
-install -d -m 700 "$PROBE_REPRO_HOME" "$PROBE_REPRO_TMP"
+for private_directory in "$PROBE_REPRO_HOME" "$PROBE_REPRO_TMP"; do
+  if test -e "$private_directory"; then
+    test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory"
+    test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700
+  else
+    install -d -m 700 "$private_directory"
+  fi
+done
 test -d "$PROBE_ACCEPTANCE_HOME"
 test -d "$PROBE_ACCEPTANCE_TMP"
 PROBE_ACCEPTANCE_PTH_SHA_RECHECK=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_ACCEPTANCE_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth" "$PROBE_ACCEPTANCE/src")
 test "$PROBE_ACCEPTANCE_PTH_SHA_RECHECK" = "$PROBE_ACCEPTANCE_PTH_SHA_BEFORE"
-git clone --no-hardlinks --local "$PROBE_ACCEPTANCE" "$PROBE_REPRO"
-git -C "$PROBE_REPRO" checkout --detach "$PROBE_REPRO_SHA"
+if test -e "$PROBE_REPRO"; then
+  test -d "$PROBE_REPRO" && test ! -L "$PROBE_REPRO"
+else
+  git clone --no-hardlinks --local --no-checkout "$PROBE_ACCEPTANCE" "$PROBE_REPRO"
+  git -C "$PROBE_REPRO" checkout --detach "$PROBE_REPRO_SHA"
+fi
 test "$(git -C "$PROBE_REPRO" rev-parse HEAD)" = "$PROBE_REPRO_SHA"
 test -z "$(git -C "$PROBE_REPRO" branch --show-current)"
 test -z "$(git -C "$PROBE_REPRO" status --porcelain)"
@@ -5225,42 +5434,80 @@ export PROBE_REPRO_CP4_ENV=/private/tmp/cellpose-mcp-probe-reproduction-cp4-${PR
 export PROBE_REPRO_CP3_ENV=/private/tmp/cellpose-mcp-probe-reproduction-cp3-${PROBE_REPRO_SHA}-${PROBE_REPRO_CP3_LOCK_SHA}
 PROBE_REPRO_CP4_PROVISIONING_ROOT=/private/tmp/cellpose-mcp-probe-repro-provisioning-${PROBE_REPRO_SHA}-cp4
 PROBE_REPRO_CP3_PROVISIONING_ROOT=/private/tmp/cellpose-mcp-probe-repro-provisioning-${PROBE_REPRO_SHA}-cp3
-test ! -e "$PROBE_REPRO_CP4_ENV"
-test ! -e "$PROBE_REPRO_CP3_ENV"
-test ! -e "$PROBE_REPRO_CP4_PROVISIONING_ROOT"
-test ! -e "$PROBE_REPRO_CP3_PROVISIONING_ROOT"
-install -d -m 700 "$PROBE_REPRO_OUTPUT"
-test ! -e "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json"
-test ! -e "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json.sha256"
-test ! -e "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json"
-test ! -e "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json.sha256"
+if test -e "$PROBE_REPRO_OUTPUT"; then
+  test -d "$PROBE_REPRO_OUTPUT" && test ! -L "$PROBE_REPRO_OUTPUT" && test -O "$PROBE_REPRO_OUTPUT"
+  test "$(/usr/bin/stat -f '%Lp' "$PROBE_REPRO_OUTPUT")" = 700
+else
+  install -d -m 700 "$PROBE_REPRO_OUTPUT"
+fi
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/bin/uv | /usr/bin/awk '{print $1}')" = "392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" /Users/suraj/.local/bin/uv --version 2>&1)" = "uv 0.10.4 (079e3fd05 2026-02-17)"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --version 2>&1)" = "Python 3.12.12"
 test "$(/usr/bin/shasum -a 256 /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 | /usr/bin/awk '{print $1}')" = "e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 --version 2>&1)" = "Python 3.11.14"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_REPRO_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_REPRO" sync --project "$PROBE_REPRO" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+if ! test -e "$PROBE_REPRO_ENV"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" UV_PROJECT_ENVIRONMENT="$PROBE_REPRO_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_REPRO" sync --project "$PROBE_REPRO" --frozen --offline --no-build --no-install-project --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev
+fi
 test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$PROBE_REPRO_ENV/bin/python")" = "/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12"
 test "$(/usr/bin/shasum -a 256 "$PROBE_REPRO_ENV/bin/python" | /usr/bin/awk '{print $1}')" = "6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483"
 test "$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" "$PROBE_REPRO_ENV/bin/python" --version 2>&1)" = "Python 3.12.12"
 PROBE_REPRO_SITE=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" "$PROBE_REPRO_ENV/bin/python" -B -I -c 'import site; paths=site.getsitepackages(); assert len(paths)==1; print(paths[0])')
 [[ $PROBE_REPRO_SITE == "$PROBE_REPRO_ENV"/*/site-packages ]]
 export PROBE_REPRO_SITE
-PROBE_REPRO_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" "$PROBE_REPRO_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.fchmod(fd,0o600); assert os.write(fd,payload)==len(payload); os.fsync(fd); os.close(fd); info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_REPRO_SITE/cellpose_mcp_probe_source.pth" "$PROBE_REPRO/src")
+PROBE_REPRO_PTH_SHA=$(/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" "$PROBE_REPRO_ENV/bin/python" -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; target=Path(sys.argv[1]); payload=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); fd=None if target.exists() else os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); (os.fchmod(fd,0o600),os.write(fd,payload),os.fsync(fd),os.close(fd)) if fd is not None else None; info=target.lstat(); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert target.read_bytes()==payload; print(hashlib.sha256(payload).hexdigest())' "$PROBE_REPRO_SITE/cellpose_mcp_probe_source.pth" "$PROBE_REPRO/src")
 [[ $PROBE_REPRO_PTH_SHA =~ ^[0-9a-f]{64}$ ]]
 export PROBE_REPRO_PTH_SHA
-test ! -e "$PROBE_REPRO_CP4_ENV"
-test ! -e "$PROBE_REPRO_CP3_ENV"
 cd "$PROBE_REPRO"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_REPRO_ENV/bin/python" -B -I -S "$PROBE_REPRO/scripts/generate_upstream_contract_evidence.py" contract --runtime cp4 --environment "$PROBE_REPRO_CP4_ENV" --cache "$PROBE_UV_CACHE" --provisioning-home "$PROBE_REPRO_CP4_PROVISIONING_ROOT/home" --provisioning-tmp "$PROBE_REPRO_CP4_PROVISIONING_ROOT/tmp" --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --uv /Users/suraj/.local/bin/uv --output "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_REPRO_ENV/bin/python" -B -I -S "$PROBE_REPRO/scripts/generate_upstream_contract_evidence.py" contract --runtime cp3 --environment "$PROBE_REPRO_CP3_ENV" --cache "$PROBE_UV_CACHE" --provisioning-home "$PROBE_REPRO_CP3_PROVISIONING_ROOT/home" --provisioning-tmp "$PROBE_REPRO_CP3_PROVISIONING_ROOT/tmp" --python /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 --uv /Users/suraj/.local/bin/uv --output "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" run --project "$PROBE_ACCEPTANCE" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev python -B -I scripts/check_upstream_contract_evidence.py --compare-invariants docs/evidence/upstream/cp4-4.2.1.1-contract.json "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" run --project "$PROBE_ACCEPTANCE" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev python -B -I scripts/check_upstream_contract_evidence.py --compare-invariants docs/evidence/upstream/cp3-3.1.1.3-contract.json "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json"
+reproduce_runtime() {
+  local runtime_name=$1 environment=$2 provisioning_root=$3 runtime_python=$4 report=$5
+  local digest="${report}.sha256"
+  local generator_sha
+  generator_sha=$(/usr/bin/shasum -a 256 "$PROBE_REPRO/scripts/generate_upstream_contract_evidence.py" | /usr/bin/awk '{print $1}') || return 1
+  if test -e "$report" || test -e "$digest" || test -e "$environment" || test -e "$provisioning_root"; then
+    test -f "$report" && test ! -L "$report" && test -O "$report" && test -f "$digest" && test ! -L "$digest" && test -O "$digest" || return 1
+    test -d "$environment" && test ! -L "$environment" && test -O "$environment" && test -x "$environment/bin/python" || return 1
+    test -d "$provisioning_root" && test ! -L "$provisioning_root" && test -O "$provisioning_root" || return 1
+    reproduction_status=$("$PROBE_REPRO_ENV/bin/python" -B -I -S -c 'import json,sys; from pathlib import Path; print(0 if json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["outcome"] == "PASS" else 2)' "$report") || return 1
+  else
+    /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_REPRO_HOME" TMPDIR="$PROBE_REPRO_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$PROBE_REPRO_ENV/bin/python" -B -I -S "$PROBE_REPRO/scripts/generate_upstream_contract_evidence.py" contract --runtime "$runtime_name" --environment "$environment" --cache "$PROBE_UV_CACHE" --provisioning-home "$provisioning_root/home" --provisioning-tmp "$provisioning_root/tmp" --python "$runtime_python" --uv /Users/suraj/.local/bin/uv --output "$report"
+    reproduction_status=$?
+  fi
+  case $reproduction_status in 0|2|3) ;; *) return 1 ;; esac
+  test -f "$report" && test ! -L "$report" && test -O "$report" && test -f "$digest" && test ! -L "$digest" && test -O "$digest" || return 1
+  test "$(/usr/bin/shasum -a 256 "$report" | /usr/bin/awk '{print $1}')  $(/usr/bin/basename "$report")" = "$(/bin/cat "$digest")" || return 1
+  test "$(/usr/bin/shasum -a 256 "$PROBE_REPRO/scripts/generate_upstream_contract_evidence.py" | /usr/bin/awk '{print $1}')" = "$generator_sha" || return 1
+  test "$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' "$environment/bin/python")" = "$runtime_python" || return 1
+  "$PROBE_REPRO_ENV/bin/python" -B -I -S - "$runtime_name" "$PROBE_REPRO_SHA" "$report" <<'PY' || return 1
+import json
+import sys
+from pathlib import Path
+
+runtime, commit_sha, report_path = sys.argv[1:]
+document = json.loads(Path(report_path).read_text(encoding="utf-8"))
+assert document["outcome"] in {"PASS", "FAIL"}
+assert document["runtime"]["runtime_id"] == runtime
+assert document["product"]["commit_sha"] == commit_sha
+print(f'reproduction {runtime}: outcome={document["outcome"]}; report={report_path}')
+PY
+  return "$reproduction_status"
+}
+set +e
+reproduce_runtime cp4 "$PROBE_REPRO_CP4_ENV" "$PROBE_REPRO_CP4_PROVISIONING_ROOT" /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json"
+PROBE_REPRO_CP4_STATUS=$?
+reproduce_runtime cp3 "$PROBE_REPRO_CP3_ENV" "$PROBE_REPRO_CP3_PROVISIONING_ROOT" /Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11 "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json"
+PROBE_REPRO_CP3_STATUS=$?
+set -e
+case $PROBE_REPRO_CP4_STATUS in 0|2|3) ;; *) exit "$PROBE_REPRO_CP4_STATUS" ;; esac
+case $PROBE_REPRO_CP3_STATUS in 0|2|3) ;; *) exit "$PROBE_REPRO_CP3_STATUS" ;; esac
 PROBE_ACCEPTANCE_PTH_SHA_AFTER=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_ACCEPTANCE_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth" "$PROBE_ACCEPTANCE/src")
 test "$PROBE_ACCEPTANCE_PTH_SHA_AFTER" = "$PROBE_ACCEPTANCE_PTH_SHA_BEFORE"
 PROBE_REPRO_PTH_SHA_AFTER=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,os,stat,sys; path=Path(sys.argv[1]); info=path.lstat(); expected=(str(Path(sys.argv[2]).resolve(strict=True))+"\n").encode("utf-8"); assert stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode); assert info.st_uid==os.getuid(); assert stat.S_IMODE(info.st_mode)==0o600; assert path.read_bytes()==expected; print(hashlib.sha256(expected).hexdigest())' "$PROBE_REPRO_ENV/lib/python3.12/site-packages/cellpose_mcp_probe_source.pth" "$PROBE_REPRO/src")
 test "$PROBE_REPRO_PTH_SHA_AFTER" = "$PROBE_REPRO_PTH_SHA"
+test "$PROBE_REPRO_CP4_STATUS" -eq 0
+test "$PROBE_REPRO_CP3_STATUS" -eq 0
+/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" run --project "$PROBE_ACCEPTANCE" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev python -B -I scripts/check_upstream_contract_evidence.py --compare-invariants docs/evidence/upstream/cp4-4.2.1.1-contract.json "$PROBE_REPRO_OUTPUT/cp4-4.2.1.1-contract.json"
+/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$PROBE_ACCEPTANCE_HOME" TMPDIR="$PROBE_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 UV_PROJECT_ENVIRONMENT="$PROBE_ACCEPTANCE_ENV" UV_CACHE_DIR="$PROBE_UV_CACHE" /Users/suraj/.local/bin/uv --directory "$PROBE_ACCEPTANCE" run --project "$PROBE_ACCEPTANCE" --frozen --offline --no-sync --no-python-downloads --no-config --python /Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 --extra test --extra dev python -B -I scripts/check_upstream_contract_evidence.py --compare-invariants docs/evidence/upstream/cp3-3.1.1.3-contract.json "$PROBE_REPRO_OUTPUT/cp3-3.1.1.3-contract.json"
 ```
 
 Expected: both invariant comparisons exit 0. All check observations, hashes,
@@ -5283,7 +5530,7 @@ test -z "$(git -C "$PROBE_ACCEPTANCE" branch --show-current)"
 test -z "$(git -C "$PROBE_ACCEPTANCE" status --porcelain)"
 PROBE_ACCEPTANCE_ROOT_LOCK_SHA=$(/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -B -I -c 'from pathlib import Path; import hashlib,sys; print(hashlib.sha256((Path(sys.argv[1])/"uv.lock").read_bytes()).hexdigest())' "$PROBE_ACCEPTANCE")
 [[ $PROBE_ACCEPTANCE_ROOT_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
-test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "dff524cf92d715606b0ac29f7ace5209558184d683b179ad19d32620b2f2fc6b"
+test "$PROBE_ACCEPTANCE_ROOT_LOCK_SHA" = "aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec"
 export PROBE_ACCEPTANCE_ROOT_LOCK_SHA
 export PROBE_UV_CACHE=/private/tmp/cellpose-mcp-probe-uv-cache-${PROBE_ACCEPTANCE_ROOT_LOCK_SHA}
 export PROBE_ACCEPTANCE_ENV=/private/tmp/cellpose-mcp-probe-acceptance-controller-${PROBE_ACCEPTANCE_SHA}
@@ -5301,9 +5548,12 @@ PROBE_ACCEPTANCE_PTH_SHA_AFTER=$(/Users/suraj/.local/share/uv/python/cpython-3.1
 test "$PROBE_ACCEPTANCE_PTH_SHA_AFTER" = "$PROBE_ACCEPTANCE_PTH_SHA_BEFORE"
 ```
 
-Expected: empty index, all pre-existing user work remains unstaged, and the
-bootstrap feature manifest still exits 1 with 14 blockers. Contract reports do
-not promote any tool.
+Expected: empty index, all pre-existing user work remains unstaged, and this
+standalone assertion process exits 0 because it successfully proves the exact
+ordered 14 blockers. Contract reports do not promote any tool. If the real
+release CLI is also invoked, do so in a separate captured-status command and
+assert status 1 plus the same ordered blocker identities; never attribute that
+CLI status to the standalone assertion above.
 
 - [ ] **Step 4: Stop before domain-contract implementation**
 

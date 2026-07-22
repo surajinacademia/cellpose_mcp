@@ -2170,6 +2170,8 @@ git commit -m "build: allowlist clean distribution contents"
 - Modify: `uv.lock`
 - Modify: `tests/packaging/test_distribution_contents.py`
 - Modify: `tests/packaging/test_python_policy.py`
+- Modify: `scripts/check_feature_manifest.py`
+- Modify: `tests/contract/test_feature_manifest.py`
 - Modify in the plan-owned prefix only: `.github/workflows/ci.yml`
 
 **Interfaces:**
@@ -2185,6 +2187,15 @@ git commit -m "build: allowlist clean distribution contents"
   bootstrap-ledger, Python-policy, and distribution-content tests on Python
   3.11 and 3.12 from the checked lock. It never collects the legacy wrapper or
   the unapproved install/segmentation experiment.
+- The manifest checker imports `cellpose_mcp.release.feature_manifest` through
+  one shared synthetic-package loader. It creates a `cellpose_mcp` package
+  spec whose `submodule_search_locations` is the real source package, inserts
+  that unexecuted synthetic package in `sys.modules`, and then executes only
+  `feature_manifest.py` under its real fully-qualified module name. The
+  contract tests load the checker once, alias its shared module/classes, prove
+  instances pickle with that real module identity, and assert that the legacy
+  runtime (`cellpose`, server/tools, FastMCP, Rich, Torch, and Typer) was never
+  imported.
 - The existing user-owned CI suffix beginning with `- name: Pytest` remains
   byte-identical in the dirty worktree but is absent from the committed blob.
 - No current MCP, Cellpose, training, installation, or scientific code is
@@ -2317,19 +2328,35 @@ FOUNDATION_ROOT_TMP=/private/tmp/cellpose-mcp-foundation-root-tmp-${FOUNDATION_R
 [[ $FOUNDATION_ROOT_CACHE == /private/tmp/cellpose-mcp-foundation-root-cache-[0-9a-f]* ]]
 [[ $FOUNDATION_ROOT_ENV_311 == /private/tmp/cellpose-mcp-foundation-root-py311-[0-9a-f]* ]]
 [[ $FOUNDATION_ROOT_ENV_312 == /private/tmp/cellpose-mcp-foundation-root-py312-[0-9a-f]* ]]
-test ! -e "$FOUNDATION_ROOT_CACHE"
-test ! -e "$FOUNDATION_ROOT_ENV_311"
-test ! -e "$FOUNDATION_ROOT_ENV_312"
-test ! -e "$FOUNDATION_ROOT_HOME"
-test ! -e "$FOUNDATION_ROOT_TMP"
-install -d -m 700 "$FOUNDATION_ROOT_CACHE" "$FOUNDATION_ROOT_HOME" "$FOUNDATION_ROOT_TMP"
+assert_private_directory() {
+  local directory=$1
+  test -d "$directory"
+  test ! -L "$directory"
+  test -O "$directory"
+  test "$(/usr/bin/stat -f '%Lp' "$directory")" = 700
+}
+for private_directory in "$FOUNDATION_ROOT_CACHE" "$FOUNDATION_ROOT_HOME" "$FOUNDATION_ROOT_TMP"; do
+  if test -e "$private_directory"; then
+    assert_private_directory "$private_directory"
+  else
+    install -d -m 700 "$private_directory"
+  fi
+done
 export FOUNDATION_ROOT_LOCK_SHA FOUNDATION_ROOT_CACHE
 export FOUNDATION_ROOT_ENV_311 FOUNDATION_ROOT_ENV_312
 export FOUNDATION_ROOT_HOME FOUNDATION_ROOT_TMP
 
 validate_network_sources "$FOUNDATION_ROOT/pyproject.toml" "$FOUNDATION_ROOT/uv.lock"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ROOT_HOME" TMPDIR="$FOUNDATION_ROOT_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ROOT_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ROOT_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ROOT" --project "$FOUNDATION_ROOT" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ROOT_HOME" TMPDIR="$FOUNDATION_ROOT_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ROOT_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ROOT_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ROOT" --project "$FOUNDATION_ROOT" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+if test -e "$FOUNDATION_ROOT_ENV_311"; then
+  assert_environment_binding "$FOUNDATION_ROOT_ENV_311" "$PY311" 3.11
+else
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ROOT_HOME" TMPDIR="$FOUNDATION_ROOT_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ROOT_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ROOT_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ROOT" --project "$FOUNDATION_ROOT" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
+if test -e "$FOUNDATION_ROOT_ENV_312"; then
+  assert_environment_binding "$FOUNDATION_ROOT_ENV_312" "$PY312" 3.12
+else
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ROOT_HOME" TMPDIR="$FOUNDATION_ROOT_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ROOT_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ROOT_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ROOT" --project "$FOUNDATION_ROOT" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
 
 validate_network_sources "$FOUNDATION_ROOT/pyproject.toml" "$FOUNDATION_ROOT/uv.lock"
 test "$(hash_file "$FOUNDATION_ROOT/uv.lock")" = "$FOUNDATION_ROOT_LOCK_SHA"
@@ -2509,14 +2536,21 @@ hash_file() {
 test "$(hash_file "$UV")" = 392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5
 test "$(hash_file "$PY311")" = e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5
 test "$(hash_file "$PY312")" = 6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483
-FOUNDATION_RUN_SHA=$(git rev-parse --short=12 HEAD)
+FOUNDATION_FULL_SHA=$(git rev-parse HEAD)
+[[ $FOUNDATION_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_RUN_SHA=${FOUNDATION_FULL_SHA:0:12}
 [[ $FOUNDATION_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
 export FOUNDATION_RUN_SHA
 FOUNDATION_OFFLINE_CANDIDATE=/private/tmp/cellpose-mcp-foundation-offline-candidate-${FOUNDATION_RUN_SHA}
 export FOUNDATION_OFFLINE_CANDIDATE
-test ! -e "$FOUNDATION_OFFLINE_CANDIDATE"
-git clone --no-hardlinks --local . "$FOUNDATION_OFFLINE_CANDIDATE"
-test "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" rev-parse HEAD)" = "$(git rev-parse HEAD)"
+if test -e "$FOUNDATION_OFFLINE_CANDIDATE"; then
+  test -d "$FOUNDATION_OFFLINE_CANDIDATE"
+  test ! -L "$FOUNDATION_OFFLINE_CANDIDATE"
+  test "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_FULL_SHA"
+else
+  git clone --no-hardlinks --local . "$FOUNDATION_OFFLINE_CANDIDATE"
+fi
+test "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_FULL_SHA"
 test -z "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" status --porcelain)"
 test "$(hash_file "$UV")" = 392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5
 test "$(hash_file "$PY311")" = e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5
@@ -2558,10 +2592,10 @@ to `test_distribution_contents.py`:
 def _poison_network_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> dict[str, str]:
-    poisoned = {
-        name: "https://poison.invalid/simple"
-        for name in _NETWORK_ENVIRONMENT_VARIABLES
-    }
+    poisoned = dict.fromkeys(
+        _NETWORK_ENVIRONMENT_VARIABLES,
+        "https://poison.invalid/simple",
+    )
     poisoned.update(
         {
             "PIP_CONFIG_FILE": "/poison/pip.conf",
@@ -2694,7 +2728,9 @@ hash_file() {
 test "$(hash_file "$UV")" = 392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5
 test "$(hash_file "$PY311")" = e6eedfbc57422e986a0e3b24b18ee45764b809ff1385d3af42e9c22b5bd00de5
 test "$(hash_file "$PY312")" = 6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324d15b6e41cdd5483
-FOUNDATION_RUN_SHA=$(git rev-parse --short=12 HEAD)
+FOUNDATION_FULL_SHA=$(git rev-parse HEAD)
+[[ $FOUNDATION_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_RUN_SHA=${FOUNDATION_FULL_SHA:0:12}
 [[ $FOUNDATION_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
 FOUNDATION_OFFLINE_CANDIDATE=/private/tmp/cellpose-mcp-foundation-offline-candidate-${FOUNDATION_RUN_SHA}
 export FOUNDATION_OFFLINE_CANDIDATE
@@ -2911,11 +2947,12 @@ assert_no_repo_generated_state "$FOUNDATION_OFFLINE_CANDIDATE"
 FOUNDATION_RESOLVE_CACHE=/private/tmp/cellpose-mcp-foundation-resolve-cache-${FOUNDATION_BASE_SHA}
 FOUNDATION_RESOLVE_HOME=/private/tmp/cellpose-mcp-foundation-resolve-home-${FOUNDATION_BASE_SHA}
 FOUNDATION_RESOLVE_TMP=/private/tmp/cellpose-mcp-foundation-resolve-tmp-${FOUNDATION_BASE_SHA}
-test ! -e "$FOUNDATION_RESOLVE_CACHE"
-test ! -e "$FOUNDATION_RESOLVE_HOME"
-test ! -e "$FOUNDATION_RESOLVE_TMP"
-install -d -m 700 "$FOUNDATION_RESOLVE_CACHE" "$FOUNDATION_RESOLVE_HOME" "$FOUNDATION_RESOLVE_TMP"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_RESOLVE_HOME" TMPDIR="$FOUNDATION_RESOLVE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_RESOLVE_CACHE" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config lock --no-build --python "$PY312" --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+for private_directory in "$FOUNDATION_RESOLVE_CACHE" "$FOUNDATION_RESOLVE_HOME" "$FOUNDATION_RESOLVE_TMP"; do
+  if test -e "$private_directory"; then test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory" && test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700; else install -d -m 700 "$private_directory"; fi
+done
+if git -C "$FOUNDATION_OFFLINE_CANDIDATE" diff --quiet -- uv.lock; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_RESOLVE_HOME" TMPDIR="$FOUNDATION_RESOLVE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_RESOLVE_CACHE" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config lock --no-build --python "$PY312" --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
 
 FOUNDATION_CANDIDATE_LOCK_SHA=$(hash_file "$FOUNDATION_OFFLINE_CANDIDATE/uv.lock")
 [[ $FOUNDATION_CANDIDATE_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
@@ -2925,14 +2962,15 @@ FOUNDATION_CANDIDATE_ENV_311=/private/tmp/cellpose-mcp-foundation-offline-py311-
 FOUNDATION_CANDIDATE_ENV_312=/private/tmp/cellpose-mcp-foundation-offline-py312-${FOUNDATION_CANDIDATE_LOCK_SHA}
 FOUNDATION_CANDIDATE_HOME=/private/tmp/cellpose-mcp-foundation-offline-home-${FOUNDATION_CANDIDATE_LOCK_SHA}
 FOUNDATION_CANDIDATE_TMP=/private/tmp/cellpose-mcp-foundation-offline-tmp-${FOUNDATION_CANDIDATE_LOCK_SHA}
-test ! -e "$FOUNDATION_CANDIDATE_CACHE"
-test ! -e "$FOUNDATION_CANDIDATE_ENV_311"
-test ! -e "$FOUNDATION_CANDIDATE_ENV_312"
-test ! -e "$FOUNDATION_CANDIDATE_HOME"
-test ! -e "$FOUNDATION_CANDIDATE_TMP"
-install -d -m 700 "$FOUNDATION_CANDIDATE_CACHE" "$FOUNDATION_CANDIDATE_HOME" "$FOUNDATION_CANDIDATE_TMP"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CANDIDATE_HOME" TMPDIR="$FOUNDATION_CANDIDATE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CANDIDATE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CANDIDATE_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CANDIDATE_HOME" TMPDIR="$FOUNDATION_CANDIDATE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CANDIDATE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CANDIDATE_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+for private_directory in "$FOUNDATION_CANDIDATE_CACHE" "$FOUNDATION_CANDIDATE_HOME" "$FOUNDATION_CANDIDATE_TMP"; do
+  if test -e "$private_directory"; then test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory" && test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700; else install -d -m 700 "$private_directory"; fi
+done
+if ! test -e "$FOUNDATION_CANDIDATE_ENV_311"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CANDIDATE_HOME" TMPDIR="$FOUNDATION_CANDIDATE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CANDIDATE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CANDIDATE_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
+if ! test -e "$FOUNDATION_CANDIDATE_ENV_312"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CANDIDATE_HOME" TMPDIR="$FOUNDATION_CANDIDATE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CANDIDATE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CANDIDATE_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_OFFLINE_CANDIDATE" --project "$FOUNDATION_OFFLINE_CANDIDATE" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
 
 validate_network_sources "$FOUNDATION_OFFLINE_CANDIDATE/pyproject.toml" "$FOUNDATION_OFFLINE_CANDIDATE/uv.lock"
 test "$(hash_file "$FOUNDATION_OFFLINE_CANDIDATE/uv.lock")" = "$FOUNDATION_CANDIDATE_LOCK_SHA"
@@ -2956,7 +2994,9 @@ test "$(git branch --show-current)" = codex/cellpose-local-first
 git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
-FOUNDATION_RUN_SHA=$(git rev-parse --short=12 HEAD)
+FOUNDATION_FULL_SHA=$(git rev-parse HEAD)
+[[ $FOUNDATION_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_RUN_SHA=${FOUNDATION_FULL_SHA:0:12}
 [[ $FOUNDATION_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
 FOUNDATION_OFFLINE_CANDIDATE=/private/tmp/cellpose-mcp-foundation-offline-candidate-${FOUNDATION_RUN_SHA}
 export FOUNDATION_OFFLINE_CANDIDATE
@@ -3008,7 +3048,9 @@ test "$(git branch --show-current)" = codex/cellpose-local-first
 git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
-FOUNDATION_RUN_SHA=$(git rev-parse --short=12 HEAD)
+FOUNDATION_FULL_SHA=$(git rev-parse HEAD)
+[[ $FOUNDATION_FULL_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_RUN_SHA=${FOUNDATION_FULL_SHA:0:12}
 [[ $FOUNDATION_RUN_SHA =~ ^[0-9a-f]{12}$ ]]
 FOUNDATION_OFFLINE_CANDIDATE=/private/tmp/cellpose-mcp-foundation-offline-candidate-${FOUNDATION_RUN_SHA}
 test "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" rev-parse HEAD)" = "$(git rev-parse HEAD)"
@@ -3033,46 +3075,58 @@ FOUNDATION_CANDIDATE_ENV_312=/private/tmp/cellpose-mcp-foundation-offline-py312-
 
 FOUNDATION_PATCH=/private/tmp/cellpose-mcp-phase0-offline-${FOUNDATION_RUN_SHA}.patch
 [[ $FOUNDATION_PATCH == /private/tmp/cellpose-mcp-phase0-offline-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].patch ]]
-test ! -e "$FOUNDATION_PATCH"
-git -C "$FOUNDATION_OFFLINE_CANDIDATE" diff --binary --output="$FOUNDATION_PATCH" -- pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock
+if test -e "$FOUNDATION_PATCH"; then
+  test -f "$FOUNDATION_PATCH" && test ! -L "$FOUNDATION_PATCH" && test -O "$FOUNDATION_PATCH"
+else
+  git -C "$FOUNDATION_OFFLINE_CANDIDATE" diff --binary --output="$FOUNDATION_PATCH" -- pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock
+fi
 test -s "$FOUNDATION_PATCH"
 FOUNDATION_PATCH_SHA=$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')
 [[ $FOUNDATION_PATCH_SHA =~ ^[0-9a-f]{64}$ ]]
 FOUNDATION_EXPECTED=/private/tmp/cellpose-mcp-phase0-offline-expected-${FOUNDATION_RUN_SHA}
-test ! -e "$FOUNDATION_EXPECTED"
-git clone --no-hardlinks --local . "$FOUNDATION_EXPECTED"
+if test -e "$FOUNDATION_EXPECTED"; then
+  test -d "$FOUNDATION_EXPECTED" && test ! -L "$FOUNDATION_EXPECTED"
+else
+  git clone --no-hardlinks --local . "$FOUNDATION_EXPECTED"
+fi
 test "$(git -C "$FOUNDATION_EXPECTED" rev-parse HEAD)" = "$(git rev-parse HEAD)"
-/bin/cp "$FOUNDATION_ROOT/pyproject.toml" "$FOUNDATION_EXPECTED/pyproject.toml"
-/bin/cp "$FOUNDATION_ROOT/tests/packaging/test_python_policy.py" "$FOUNDATION_EXPECTED/tests/packaging/test_python_policy.py"
-git -C "$FOUNDATION_EXPECTED" apply --check "$FOUNDATION_PATCH"
-git -C "$FOUNDATION_EXPECTED" apply "$FOUNDATION_PATCH"
+if git -C "$FOUNDATION_EXPECTED" apply --reverse --check "$FOUNDATION_PATCH"; then
+  : # already contains the complete expected post-patch tree
+else
+  if test -z "$(git -C "$FOUNDATION_EXPECTED" status --porcelain)"; then
+    /bin/cp "$FOUNDATION_ROOT/pyproject.toml" "$FOUNDATION_EXPECTED/pyproject.toml"
+    /bin/cp "$FOUNDATION_ROOT/tests/packaging/test_python_policy.py" "$FOUNDATION_EXPECTED/tests/packaging/test_python_policy.py"
+  fi
+  git -C "$FOUNDATION_EXPECTED" apply --check "$FOUNDATION_PATCH"
+  git -C "$FOUNDATION_EXPECTED" apply "$FOUNDATION_PATCH"
+fi
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_PATCH_SHA"
 git apply --check "$FOUNDATION_PATCH"
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_PATCH_SHA"
 git apply "$FOUNDATION_PATCH"
 test "$(git diff --name-only -- pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock)" = "$EXPECTED_PATHS"
 git apply --reverse --check "$FOUNDATION_PATCH"
-for path in pyproject.toml tests/packaging/test_python_policy.py; do
-  test "$(git hash-object "$path")" = "$(git -C "$FOUNDATION_EXPECTED" hash-object "$path")"
+for expected_path in pyproject.toml tests/packaging/test_python_policy.py; do
+  test "$(git hash-object "$expected_path")" = "$(git -C "$FOUNDATION_EXPECTED" hash-object "$expected_path")"
 done
-for path in tests/packaging/test_distribution_contents.py uv.lock; do
-  test "$(git hash-object "$path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$path")"
+for candidate_path in tests/packaging/test_distribution_contents.py uv.lock; do
+  test "$(git hash-object "$candidate_path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$candidate_path")"
 done
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_PATCH_SHA"
 git apply --cached --check "$FOUNDATION_PATCH"
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_PATCH_SHA"
 git apply --cached "$FOUNDATION_PATCH"
 test "$(git diff --cached --name-only)" = "$EXPECTED_PATHS"
-for path in pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock; do
-  test "$(git rev-parse ":$path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$path")"
+for staged_path in pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock; do
+  test "$(git rev-parse ":$staged_path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$staged_path")"
 done
 git diff --cached --check
 git commit -m "test: make distribution proof offline"
 test "$(git log -1 --format=%s)" = "test: make distribution proof offline"
 test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$EXPECTED_PATHS"
 test "$(git rev-parse HEAD^)" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" rev-parse HEAD)"
-for path in pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock; do
-  test "$(git rev-parse "HEAD:$path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$path")"
+for committed_path in pyproject.toml tests/packaging/test_distribution_contents.py tests/packaging/test_python_policy.py uv.lock; do
+  test "$(git rev-parse "HEAD:$committed_path")" = "$(git -C "$FOUNDATION_OFFLINE_CANDIDATE" hash-object "$committed_path")"
 done
 git diff --quiet -- uv.lock tests/packaging/test_distribution_contents.py
 git diff --cached --quiet
@@ -3197,6 +3251,70 @@ def test_ci_is_truthfully_foundation_only() -> None:
     assert not any(fragment in workflow for fragment in forbidden)
 ```
 
+Also replace the checker's eager package import with the approved shared
+loader below. The synthetic package is inserted but its loader is deliberately
+not executed; only the release contract module is executed under its canonical
+name:
+
+```python
+import importlib.util
+import sys
+from pathlib import Path
+from types import ModuleType
+
+FEATURE_MANIFEST_MODULE_NAME = "cellpose_mcp.release.feature_manifest"
+
+
+def load_feature_manifest_module() -> ModuleType:
+    """Load the real release contract without running the legacy package."""
+    loaded = sys.modules.get(FEATURE_MANIFEST_MODULE_NAME)
+    if loaded is not None:
+        return loaded
+    root = Path(__file__).resolve().parents[1]
+    package_dir = root / "src/cellpose_mcp"
+    package_spec = importlib.util.spec_from_file_location(
+        "cellpose_mcp",
+        package_dir / "__init__.py",
+        submodule_search_locations=[str(package_dir)],
+    )
+    if package_spec is None or package_spec.loader is None:
+        raise RuntimeError("cannot create the cellpose_mcp package spec")
+    sys.modules[package_spec.name] = importlib.util.module_from_spec(package_spec)
+    module_spec = importlib.util.spec_from_file_location(
+        FEATURE_MANIFEST_MODULE_NAME,
+        package_dir / "release/feature_manifest.py",
+    )
+    if module_spec is None or module_spec.loader is None:
+        raise RuntimeError("cannot create the feature manifest module spec")
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_spec.name] = module
+    module_spec.loader.exec_module(module)
+    return module
+
+
+FEATURE_MANIFEST = load_feature_manifest_module()
+load_feature_manifest = FEATURE_MANIFEST.load_feature_manifest
+release_gate_failures = FEATURE_MANIFEST.release_gate_failures
+```
+
+In `tests/contract/test_feature_manifest.py`, load that real checker with an
+`importlib.util.spec_from_file_location` spec named
+`_cellpose_mcp_check_feature_manifest`, insert it in `sys.modules`, execute it
+once, and alias every manifest constant/class/function from
+`CHECK_MODULE.FEATURE_MANIFEST`. Extend the structural test with:
+
+```python
+    assert manifest.__class__ is BootstrapFeatureManifest
+    serialized = pickle.dumps(manifest)
+    assert b"cellpose_mcp.release.feature_manifest" in serialized
+    assert_legacy_runtime_absent()
+```
+
+`assert_legacy_runtime_absent` rejects `cellpose`, `cellpose_mcp.server`,
+`cellpose_mcp.tools`, `fastmcp`, `rich`, `torch`, and `typer` in
+`sys.modules`. These two import-isolation edits are candidate-owned and are
+part of the final four-path CI commit.
+
 - [ ] **Step 10: Prove the new truthfulness assertion is RED**
 
 Create a local clean candidate clone from the now-current commit; do not copy
@@ -3216,8 +3334,13 @@ FOUNDATION_BASE_SHA=$(git rev-parse HEAD)
 FOUNDATION_RUN_SHA=${FOUNDATION_BASE_SHA:0:12}
 FOUNDATION_CANDIDATE=/private/tmp/cellpose-mcp-foundation-ci-candidate-${FOUNDATION_RUN_SHA}
 export FOUNDATION_CANDIDATE
-test ! -e "$FOUNDATION_CANDIDATE"
-git clone --no-hardlinks --local . "$FOUNDATION_CANDIDATE"
+if test -e "$FOUNDATION_CANDIDATE"; then
+  test -d "$FOUNDATION_CANDIDATE" && test ! -L "$FOUNDATION_CANDIDATE"
+  test "$(git -C "$FOUNDATION_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_BASE_SHA"
+  test -z "$(git -C "$FOUNDATION_CANDIDATE" status --porcelain)"
+else
+  git clone --no-hardlinks --local . "$FOUNDATION_CANDIDATE"
+fi
 test "$(git -C "$FOUNDATION_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_BASE_SHA"
 test -z "$(git -C "$FOUNDATION_CANDIDATE" status --porcelain)"
 test ! -e "$FOUNDATION_CANDIDATE/tests/test_installation.py"
@@ -3239,15 +3362,16 @@ FOUNDATION_CI_ENV_312=/private/tmp/cellpose-mcp-foundation-ci-py312-${FOUNDATION
 FOUNDATION_CI_HOME=/private/tmp/cellpose-mcp-foundation-ci-home-${FOUNDATION_BASE_SHA}-${FOUNDATION_CI_LOCK_SHA}
 FOUNDATION_CI_TMP=/private/tmp/cellpose-mcp-foundation-ci-tmp-${FOUNDATION_BASE_SHA}-${FOUNDATION_CI_LOCK_SHA}
 test -d "$FOUNDATION_SOURCE_CACHE"
-test ! -e "$FOUNDATION_CI_CACHE"
-test ! -e "$FOUNDATION_CI_ENV_311"
-test ! -e "$FOUNDATION_CI_ENV_312"
-test ! -e "$FOUNDATION_CI_HOME"
-test ! -e "$FOUNDATION_CI_TMP"
-/bin/cp -R "$FOUNDATION_SOURCE_CACHE" "$FOUNDATION_CI_CACHE"
-install -d -m 700 "$FOUNDATION_CI_HOME" "$FOUNDATION_CI_TMP"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CI_HOME" TMPDIR="$FOUNDATION_CI_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CI_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CI_ENV_311" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_CANDIDATE" --project "$FOUNDATION_CANDIDATE" --no-config sync --frozen --offline --no-install-project --no-build --python "$PY311" --extra test --extra dev --no-python-downloads
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CI_HOME" TMPDIR="$FOUNDATION_CI_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CI_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CI_ENV_312" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_CANDIDATE" --project "$FOUNDATION_CANDIDATE" --no-config sync --frozen --offline --no-install-project --no-build --python "$PY312" --extra test --extra dev --no-python-downloads
+if test -e "$FOUNDATION_CI_CACHE"; then test -d "$FOUNDATION_CI_CACHE" && test ! -L "$FOUNDATION_CI_CACHE" && test -O "$FOUNDATION_CI_CACHE"; else /bin/cp -R "$FOUNDATION_SOURCE_CACHE" "$FOUNDATION_CI_CACHE"; fi
+for private_directory in "$FOUNDATION_CI_HOME" "$FOUNDATION_CI_TMP"; do
+  if test -e "$private_directory"; then test -d "$private_directory" && test ! -L "$private_directory" && test -O "$private_directory" && test "$(/usr/bin/stat -f '%Lp' "$private_directory")" = 700; else install -d -m 700 "$private_directory"; fi
+done
+if ! test -e "$FOUNDATION_CI_ENV_311"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CI_HOME" TMPDIR="$FOUNDATION_CI_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CI_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CI_ENV_311" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_CANDIDATE" --project "$FOUNDATION_CANDIDATE" --no-config sync --frozen --offline --no-install-project --no-build --python "$PY311" --extra test --extra dev --no-python-downloads
+fi
+if ! test -e "$FOUNDATION_CI_ENV_312"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_CI_HOME" TMPDIR="$FOUNDATION_CI_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_CI_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_CI_ENV_312" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_CANDIDATE" --project "$FOUNDATION_CANDIDATE" --no-config sync --frozen --offline --no-install-project --no-build --python "$PY312" --extra test --extra dev --no-python-downloads
+fi
 "$FOUNDATION_CI_ENV_311/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve()' "$FOUNDATION_CI_ENV_311" "$PY311"
 "$FOUNDATION_CI_ENV_312/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve()' "$FOUNDATION_CI_ENV_312" "$PY312"
 for relative in .pytest_cache .ruff_cache .mypy_cache build dist src/cellpose_mcp.egg-info; do
@@ -3371,6 +3495,7 @@ jobs:
           --python "${{ matrix.python-version }}"
           --extra test --extra dev mypy
           --cache-dir "${{ runner.temp }}/mypy-${{ matrix.python-version }}"
+          --python-version "${{ matrix.python-version }}"
           src/cellpose_mcp/release scripts/check_feature_manifest.py
           scripts/inventory_worktree.py
 ```
@@ -3404,7 +3529,7 @@ export FOUNDATION_CANDIDATE
 test "$(git -C "$FOUNDATION_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_BASE_SHA"
 git -C "$FOUNDATION_CANDIDATE" diff --cached --quiet
 test -z "$(git -C "$FOUNDATION_CANDIDATE" ls-files --others --exclude-standard)"
-EXPECTED_CANDIDATE_PATHS=$'.github/workflows/ci.yml\ntests/packaging/test_python_policy.py'
+EXPECTED_CANDIDATE_PATHS=$'.github/workflows/ci.yml\nscripts/check_feature_manifest.py\ntests/contract/test_feature_manifest.py\ntests/packaging/test_python_policy.py'
 test "$(git -C "$FOUNDATION_CANDIDATE" diff --name-only)" = "$EXPECTED_CANDIDATE_PATHS"
 
 UV=/Users/suraj/.local/bin/uv
@@ -3434,19 +3559,33 @@ foundation_run_312() {
 
 JUNIT_311="$FOUNDATION_CI_TMP/foundation-60-py311.xml"
 JUNIT_312="$FOUNDATION_CI_TMP/foundation-60-py312.xml"
-test ! -e "$JUNIT_311"
-test ! -e "$JUNIT_312"
-foundation_run_311 python -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_CI_ENV_311" "$PY311"
-foundation_run_311 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_311"
+foundation_run_311 "$FOUNDATION_CI_ENV_311/bin/python" -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_CI_ENV_311" "$PY311"
+if test -e "$JUNIT_311"; then
+  test -f "$JUNIT_311" && test ! -L "$JUNIT_311"; echo "reusing JUnit sha256=$(hash_file "$JUNIT_311")"
+else
+  set +e
+  foundation_run_311 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_311"
+  JUNIT_STATUS=$?
+  set -e
+  if test "$JUNIT_STATUS" -ne 0; then FAILED_JUNIT_SHA=$(hash_file "$JUNIT_311"); JUNIT_RETRY="${JUNIT_311%.xml}.retry-${FAILED_JUNIT_SHA:0:12}.xml"; test ! -e "$JUNIT_RETRY"; echo "retained $FAILED_JUNIT_SHA; retry only at $JUNIT_RETRY" >&2; exit "$JUNIT_STATUS"; fi
+fi
 foundation_run_311 python -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_311"
-foundation_run_312 python -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_CI_ENV_312" "$PY312"
-foundation_run_312 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_312"
+foundation_run_312 "$FOUNDATION_CI_ENV_312/bin/python" -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_CI_ENV_312" "$PY312"
+if test -e "$JUNIT_312"; then
+  test -f "$JUNIT_312" && test ! -L "$JUNIT_312"; echo "reusing JUnit sha256=$(hash_file "$JUNIT_312")"
+else
+  set +e
+  foundation_run_312 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_312"
+  JUNIT_STATUS=$?
+  set -e
+  if test "$JUNIT_STATUS" -ne 0; then FAILED_JUNIT_SHA=$(hash_file "$JUNIT_312"); JUNIT_RETRY="${JUNIT_312%.xml}.retry-${FAILED_JUNIT_SHA:0:12}.xml"; test ! -e "$JUNIT_RETRY"; echo "retained $FAILED_JUNIT_SHA; retry only at $JUNIT_RETRY" >&2; exit "$JUNIT_STATUS"; fi
+fi
 foundation_run_312 python -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_312"
 
 foundation_run_311 ruff check --no-fix --no-cache src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging
-foundation_run_311 mypy --cache-dir "$FOUNDATION_CI_TMP/mypy-py311" src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
+foundation_run_311 mypy --cache-dir "$FOUNDATION_CI_TMP/mypy-py311" --python-version 3.11 src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
 foundation_run_312 ruff check --no-fix --no-cache src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging
-foundation_run_312 mypy --cache-dir "$FOUNDATION_CI_TMP/mypy-py312" src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
+foundation_run_312 mypy --cache-dir "$FOUNDATION_CI_TMP/mypy-py312" --python-version 3.12 src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
 foundation_run_312 python -c 'import subprocess,sys; result=subprocess.run([sys.executable,"scripts/check_feature_manifest.py"],check=False,capture_output=True,text=True); assert result.returncode==0; assert result.stdout=="bootstrap manifest valid; release blockers: 14\n"; assert result.stderr==""'
 foundation_run_312 python -c 'import subprocess,sys; tools=["get_capabilities","inspect_image","list_models","prepare_model","segment","refine_segmentation","measure_masks","evaluate_segmentation","export_segmentation","train_model","restore_image","get_job","cancel_job"]; result=subprocess.run([sys.executable,"scripts/check_feature_manifest.py","--release"],check=False,capture_output=True,text=True); lines=result.stdout.splitlines(); assert result.returncode==1; assert result.stderr==""; assert len(lines)==14; assert lines[0].startswith("unresolved_core_matrix: core_capability_matrix_unresolved:"); assert [line.split(": ",2)[1] for line in lines[1:]]==tools'
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_CANDIDATE/uv.lock" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_CI_LOCK_SHA"
@@ -3498,14 +3637,23 @@ test "$(hash_file "$PY312")" = 6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324
 Use `apply_patch` to make only the workflow prefix match the candidate through
 the `Mypy foundation` step. Retain the suffix beginning with
 `      - name: Pytest` byte-for-byte. Apply the finalized policy-test edit from
-the candidate to the dirty root, then rerun both hash assertions above.
+the candidate to the dirty root, and apply the two manifest import-isolation
+edits to `scripts/check_feature_manifest.py` and
+`tests/contract/test_feature_manifest.py`. Then rerun both hash assertions
+above. The candidate reverse-check in Step 14 must succeed for all four paths;
+that is the proof that the dirty worktree contains the candidate bytes before
+the patch is applied to the index only.
 
 The dirty root's truthfulness test is expected to fail while this preserved
 suffix exists. The clean candidate is the authoritative validation source.
+The split invariant is: the worktree workflow equals the exact committed
+candidate prefix followed by the inventoried suffix whose SHA-256 is
+`869a85e6af80aefddde2614d0953d96ed1fcbc688f3fb6aaea16ff0ace6ab790`;
+only the candidate prefix enters the index.
 
 - [ ] **Step 14: Stage the exact clean candidate diff, never the dirty suffix**
 
-Generate and validate a two-file binary patch:
+Generate and validate a four-file binary patch:
 
 ```bash
 set -euo pipefail
@@ -3539,13 +3687,16 @@ test -x "$FOUNDATION_CI_ENV_311/bin/python"
 test -x "$FOUNDATION_CI_ENV_312/bin/python"
 "$FOUNDATION_CI_ENV_311/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_CI_ENV_311" "$PY311"
 "$FOUNDATION_CI_ENV_312/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_CI_ENV_312" "$PY312"
-EXPECTED_PATHS=$'.github/workflows/ci.yml\ntests/packaging/test_python_policy.py'
+EXPECTED_PATHS=$'.github/workflows/ci.yml\nscripts/check_feature_manifest.py\ntests/contract/test_feature_manifest.py\ntests/packaging/test_python_policy.py'
 test "$(git -C "$FOUNDATION_CANDIDATE" diff --name-only)" = "$EXPECTED_PATHS"
 FOUNDATION_PATCH=/private/tmp/cellpose-mcp-phase0-ci-${FOUNDATION_RUN_SHA}.patch
 [[ $FOUNDATION_PATCH == /private/tmp/cellpose-mcp-phase0-ci-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].patch ]]
 export FOUNDATION_PATCH
-test ! -e "$FOUNDATION_PATCH"
-git -C "$FOUNDATION_CANDIDATE" diff --binary --output="$FOUNDATION_PATCH" -- .github/workflows/ci.yml tests/packaging/test_python_policy.py
+if test -e "$FOUNDATION_PATCH"; then
+  test -f "$FOUNDATION_PATCH" && test ! -L "$FOUNDATION_PATCH" && test -O "$FOUNDATION_PATCH"
+else
+  git -C "$FOUNDATION_CANDIDATE" diff --binary --output="$FOUNDATION_PATCH" -- .github/workflows/ci.yml scripts/check_feature_manifest.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py
+fi
 test -s "$FOUNDATION_PATCH"
 FOUNDATION_PATCH_SHA=$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')
 [[ $FOUNDATION_PATCH_SHA =~ ^[0-9a-f]{64}$ ]]
@@ -3556,8 +3707,8 @@ test "$(/usr/bin/shasum -a 256 "$FOUNDATION_PATCH" | /usr/bin/awk '{print $1}')"
 git apply --cached "$FOUNDATION_PATCH"
 git diff --cached --check
 test "$(git diff --cached --name-only)" = "$EXPECTED_PATHS"
-for path in .github/workflows/ci.yml tests/packaging/test_python_policy.py; do
-  test "$(git rev-parse ":$path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$path")"
+for staged_path in .github/workflows/ci.yml scripts/check_feature_manifest.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py; do
+  test "$(git rev-parse ":$staged_path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$staged_path")"
 done
 "$PY312" -I -c 'import subprocess; w=subprocess.check_output(["git","show",":.github/workflows/ci.yml"],text=True); assert w.startswith("name: Foundation CI\n"); assert "\n  foundation:\n" in w; assert "pytest -m " not in w; assert "install-e2e:" not in w; assert "tests/test_installation.py" not in w'
 test "$(hash_file "$UV")" = 392016c5bca9eb01bef3ae3957a8ed93d3bd9fe837825b5c4cc313e50c15a4d5
@@ -3568,8 +3719,9 @@ test "$(hash_file "$PY312")" = 6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324
 The final assertion inspects the indexed workflow, not the dirty worktree
 version.
 
-Expected: exactly the two planned files are staged and the indexed workflow is
-foundation-only.
+Expected: exactly the four planned files are staged and the indexed workflow
+is foundation-only. `git apply --reverse --check` proves that the dirty root's
+approved prefix already matches the candidate before the index-only apply.
 
 - [ ] **Step 15: Commit CI and prove the preserved work survived**
 
@@ -3586,10 +3738,10 @@ FOUNDATION_BASE_SHA=$(git rev-parse HEAD)
 FOUNDATION_RUN_SHA=${FOUNDATION_BASE_SHA:0:12}
 FOUNDATION_CANDIDATE=/private/tmp/cellpose-mcp-foundation-ci-candidate-${FOUNDATION_RUN_SHA}
 test "$(git -C "$FOUNDATION_CANDIDATE" rev-parse HEAD)" = "$FOUNDATION_BASE_SHA"
-EXPECTED_PATHS=$'.github/workflows/ci.yml\ntests/packaging/test_python_policy.py'
+EXPECTED_PATHS=$'.github/workflows/ci.yml\nscripts/check_feature_manifest.py\ntests/contract/test_feature_manifest.py\ntests/packaging/test_python_policy.py'
 test "$(git diff --cached --name-only)" = "$EXPECTED_PATHS"
-for path in .github/workflows/ci.yml tests/packaging/test_python_policy.py; do
-  test "$(git rev-parse ":$path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$path")"
+for staged_path in .github/workflows/ci.yml scripts/check_feature_manifest.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py; do
+  test "$(git rev-parse ":$staged_path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$staged_path")"
 done
 UV=/Users/suraj/.local/bin/uv
 PY311=/Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11
@@ -3609,8 +3761,8 @@ git commit -m "ci: enforce truthful repository foundation"
 test "$(git rev-parse HEAD^)" = "$FOUNDATION_BASE_SHA"
 test "$(git log -1 --format=%s)" = "ci: enforce truthful repository foundation"
 test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$EXPECTED_PATHS"
-for path in .github/workflows/ci.yml tests/packaging/test_python_policy.py; do
-  test "$(git rev-parse "HEAD:$path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$path")"
+for committed_path in .github/workflows/ci.yml scripts/check_feature_manifest.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py; do
+  test "$(git rev-parse "HEAD:$committed_path")" = "$(git -C "$FOUNDATION_CANDIDATE" hash-object "$committed_path")"
 done
 "$PY312" -I -c 'from pathlib import Path; import hashlib; p=Path(".github/workflows/ci.yml").read_bytes(); marker=b"      - name: Pytest\n"; tail=p[p.index(marker):]; assert hashlib.sha256(tail).hexdigest()=="869a85e6af80aefddde2614d0953d96ed1fcbc688f3fb6aaea16ff0ace6ab790"'
 "$PY312" -I -c 'from pathlib import Path; import hashlib; assert hashlib.sha256(Path("tests/test_installation.py").read_bytes()).hexdigest()=="3e4ef691dcb3b7f7f59c8cc5743626a5279d33b3fb848e09f3ff56206c52996d"'
@@ -3675,13 +3827,37 @@ test and all unrelated user work remain present and unstaged.
 **Interfaces:** This is a validation-only gate. It proves the commit users and
 GitHub receive, independently of preserved dirty-root experiments.
 
+**Completed acceptance binding:** Phase 0 is permanently bound to commit
+`c926877105873cd9e6c091bb849333800c5cc1ac`, parent
+`d0039330718f4967eb4a023ebb8c463337de72f8`, and grandparent
+`847e9f2dfd85568d29095e900861b828e01f3fc9`. Their subjects, newest first,
+are `ci: enforce truthful repository foundation`,
+`test: make distribution proof offline`, and
+`fix: clarify inventory archive failures`. This historical proof is checked
+with `git show` on those objects, never with the moving current `git log -3`.
+The acceptance clone is
+`/private/tmp/cellpose-mcp-foundation-acceptance-c92687710587`; its lock is
+`aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec`.
+Its interpreters are
+`/private/tmp/cellpose-mcp-foundation-acceptance-py311-c926877105873cd9e6c091bb849333800c5cc1ac-aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec/bin/python`
+and
+`/private/tmp/cellpose-mcp-foundation-acceptance-py312-c926877105873cd9e6c091bb849333800c5cc1ac-aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec/bin/python`.
+The acceptance temp root is
+`/private/tmp/cellpose-mcp-foundation-acceptance-tmp-c926877105873cd9e6c091bb849333800c5cc1ac-aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec`;
+the focused Python 3.11, focused Python 3.12, and distribution JUnit hashes are
+respectively `c7fe743c44ad572132f8acee0faf0a887634586754bb7adeddbe1c6fd7ff06e7`,
+`6a423a41df3af6598d59ffd3a4fc6fe0c48a26e076a783ffe0aa42e89b52411c`,
+and `d3a56d27b00966319cb0fce66e33d7b889b5ce9a3eb20d784f4e2a2051d55a86`.
+
 - [ ] **Step 1: Create a clean local acceptance clone**
 
 Re-enter the same explicitly approved package boundary used in Task 6:
 `https://pypi.org/simple` plus artifact URLs beneath
-`https://files.pythonhosted.org/`. The fresh acceptance cache, environments,
-home, and temporary directory are keyed by the exact committed SHA and lock
-SHA; each must be absent first.
+`https://files.pythonhosted.org/`. The acceptance cache, environments, home,
+and temporary directory are keyed by the exact completed SHA and lock SHA.
+Create an absent path; otherwise validate its type, ownership, mode, commit,
+lock, and interpreter binding before reuse. Never delete or overwrite Phase 0
+evidence.
 
 ```bash
 set -euo pipefail
@@ -3693,14 +3869,25 @@ git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
 EXPECTED_COMMITS=$'ci: enforce truthful repository foundation\ntest: make distribution proof offline\nfix: clarify inventory archive failures'
-test "$(git log -3 --format=%s)" = "$EXPECTED_COMMITS"
-FOUNDATION_ACCEPTANCE_SHA=$(git rev-parse HEAD)
-[[ $FOUNDATION_ACCEPTANCE_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
+FOUNDATION_ACCEPTANCE_PARENT=d0039330718f4967eb4a023ebb8c463337de72f8
+FOUNDATION_ACCEPTANCE_GRANDPARENT=847e9f2dfd85568d29095e900861b828e01f3fc9
+test "$(git rev-parse "${FOUNDATION_ACCEPTANCE_SHA}^")" = "$FOUNDATION_ACCEPTANCE_PARENT"
+test "$(git rev-parse "${FOUNDATION_ACCEPTANCE_PARENT}^")" = "$FOUNDATION_ACCEPTANCE_GRANDPARENT"
+test "$(git show -s --format=%s "$FOUNDATION_ACCEPTANCE_SHA")" = "ci: enforce truthful repository foundation"
+test "$(git show -s --format=%s "$FOUNDATION_ACCEPTANCE_PARENT")" = "test: make distribution proof offline"
+test "$(git show -s --format=%s "$FOUNDATION_ACCEPTANCE_GRANDPARENT")" = "fix: clarify inventory archive failures"
 FOUNDATION_RUN_SHA=${FOUNDATION_ACCEPTANCE_SHA:0:12}
 FOUNDATION_ACCEPTANCE=/private/tmp/cellpose-mcp-foundation-acceptance-${FOUNDATION_RUN_SHA}
+test "$FOUNDATION_ACCEPTANCE" = /private/tmp/cellpose-mcp-foundation-acceptance-c92687710587
 export FOUNDATION_ACCEPTANCE
-test ! -e "$FOUNDATION_ACCEPTANCE"
-git clone --no-hardlinks --local . "$FOUNDATION_ACCEPTANCE"
+if test -e "$FOUNDATION_ACCEPTANCE"; then
+  test -d "$FOUNDATION_ACCEPTANCE"
+  test ! -L "$FOUNDATION_ACCEPTANCE"
+else
+  git clone --no-hardlinks --local --no-checkout . "$FOUNDATION_ACCEPTANCE"
+  git -C "$FOUNDATION_ACCEPTANCE" checkout --detach "$FOUNDATION_ACCEPTANCE_SHA"
+fi
 test "$(git -C "$FOUNDATION_ACCEPTANCE" rev-parse HEAD)" = "$FOUNDATION_ACCEPTANCE_SHA"
 test -z "$(git -C "$FOUNDATION_ACCEPTANCE" status --porcelain)"
 test ! -e "$FOUNDATION_ACCEPTANCE/src/cellpose_mcp/operations.py"
@@ -3748,21 +3935,27 @@ for package in lock["package"]:
 PY
 }
 FOUNDATION_ACCEPTANCE_LOCK_SHA=$(hash_file "$FOUNDATION_ACCEPTANCE/uv.lock")
-[[ $FOUNDATION_ACCEPTANCE_LOCK_SHA =~ ^[0-9a-f]{64}$ ]]
+test "$FOUNDATION_ACCEPTANCE_LOCK_SHA" = aea5be18a2e96f348f618e835c3bdff2f54d0cbabb479ee84a5bc536144a74ec
 FOUNDATION_ACCEPTANCE_CACHE=/private/tmp/cellpose-mcp-foundation-acceptance-cache-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_ENV_311=/private/tmp/cellpose-mcp-foundation-acceptance-py311-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_ENV_312=/private/tmp/cellpose-mcp-foundation-acceptance-py312-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_HOME=/private/tmp/cellpose-mcp-foundation-acceptance-home-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
 FOUNDATION_ACCEPTANCE_TMP=/private/tmp/cellpose-mcp-foundation-acceptance-tmp-${FOUNDATION_ACCEPTANCE_SHA}-${FOUNDATION_ACCEPTANCE_LOCK_SHA}
-test ! -e "$FOUNDATION_ACCEPTANCE_CACHE"
-test ! -e "$FOUNDATION_ACCEPTANCE_ENV_311"
-test ! -e "$FOUNDATION_ACCEPTANCE_ENV_312"
-test ! -e "$FOUNDATION_ACCEPTANCE_HOME"
-test ! -e "$FOUNDATION_ACCEPTANCE_TMP"
-install -d -m 700 "$FOUNDATION_ACCEPTANCE_CACHE" "$FOUNDATION_ACCEPTANCE_HOME" "$FOUNDATION_ACCEPTANCE_TMP"
+assert_private_directory() {
+  local directory=$1
+  test -d "$directory" && test ! -L "$directory" && test -O "$directory"
+  test "$(/usr/bin/stat -f '%Lp' "$directory")" = 700
+}
+for private_directory in "$FOUNDATION_ACCEPTANCE_CACHE" "$FOUNDATION_ACCEPTANCE_HOME" "$FOUNDATION_ACCEPTANCE_TMP"; do
+  if test -e "$private_directory"; then assert_private_directory "$private_directory"; else install -d -m 700 "$private_directory"; fi
+done
 validate_network_sources "$FOUNDATION_ACCEPTANCE/pyproject.toml" "$FOUNDATION_ACCEPTANCE/uv.lock"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+if ! test -e "$FOUNDATION_ACCEPTANCE_ENV_311"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_311" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config sync --frozen --no-install-project --no-build --python "$PY311" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
+if ! test -e "$FOUNDATION_ACCEPTANCE_ENV_312"; then
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_312" UV_DEFAULT_INDEX=https://pypi.org/simple UV_KEYRING_PROVIDER=disabled UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config sync --frozen --no-install-project --no-build --python "$PY312" --extra test --extra dev --default-index https://pypi.org/simple --keyring-provider disabled --no-python-downloads
+fi
 validate_network_sources "$FOUNDATION_ACCEPTANCE/pyproject.toml" "$FOUNDATION_ACCEPTANCE/uv.lock"
 test "$(hash_file "$FOUNDATION_ACCEPTANCE/uv.lock")" = "$FOUNDATION_ACCEPTANCE_LOCK_SHA"
 "$FOUNDATION_ACCEPTANCE_ENV_311/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_ACCEPTANCE_ENV_311" "$PY311"
@@ -3792,8 +3985,7 @@ test "$(git branch --show-current)" = codex/cellpose-local-first
 git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
-FOUNDATION_ACCEPTANCE_SHA=$(git rev-parse HEAD)
-[[ $FOUNDATION_ACCEPTANCE_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
 FOUNDATION_RUN_SHA=${FOUNDATION_ACCEPTANCE_SHA:0:12}
 FOUNDATION_ACCEPTANCE=/private/tmp/cellpose-mcp-foundation-acceptance-${FOUNDATION_RUN_SHA}
 export FOUNDATION_ACCEPTANCE
@@ -3828,18 +4020,48 @@ acceptance_run_312() {
 
 JUNIT_311="$FOUNDATION_ACCEPTANCE_TMP/foundation-60-py311.xml"
 JUNIT_312="$FOUNDATION_ACCEPTANCE_TMP/foundation-60-py312.xml"
-test ! -e "$JUNIT_311"
-test ! -e "$JUNIT_312"
-acceptance_run_311 python -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_ACCEPTANCE_ENV_311" "$PY311"
-acceptance_run_311 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_311"
-acceptance_run_311 python -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_311"
-acceptance_run_312 python -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_ACCEPTANCE_ENV_312" "$PY312"
-acceptance_run_312 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_312"
-acceptance_run_312 python -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_312"
+EXPECTED_JUNIT_311_SHA=c7fe743c44ad572132f8acee0faf0a887634586754bb7adeddbe1c6fd7ff06e7
+EXPECTED_JUNIT_312_SHA=6a423a41df3af6598d59ffd3a4fc6fe0c48a26e076a783ffe0aa42e89b52411c
+acceptance_run_311 "$FOUNDATION_ACCEPTANCE_ENV_311/bin/python" -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_ACCEPTANCE_ENV_311" "$PY311"
+if test -e "$JUNIT_311"; then
+  test -f "$JUNIT_311" && test ! -L "$JUNIT_311"
+  test "$(hash_file "$JUNIT_311")" = "$EXPECTED_JUNIT_311_SHA"
+else
+  set +e
+  acceptance_run_311 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_311"
+  JUNIT_STATUS=$?
+  set -e
+  if test "$JUNIT_STATUS" -ne 0; then
+    test -f "$JUNIT_311"; FAILED_JUNIT_SHA=$(hash_file "$JUNIT_311")
+    JUNIT_RETRY_311="${JUNIT_311%.xml}.retry-${FAILED_JUNIT_SHA:0:12}.xml"
+    test ! -e "$JUNIT_RETRY_311"
+    echo "retained failed JUnit $FAILED_JUNIT_SHA; retry only at $JUNIT_RETRY_311" >&2
+    exit "$JUNIT_STATUS"
+  fi
+fi
+acceptance_run_311 "$FOUNDATION_ACCEPTANCE_ENV_311/bin/python" -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_311"
+acceptance_run_312 "$FOUNDATION_ACCEPTANCE_ENV_312/bin/python" -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_ACCEPTANCE_ENV_312" "$PY312"
+if test -e "$JUNIT_312"; then
+  test -f "$JUNIT_312" && test ! -L "$JUNIT_312"
+  test "$(hash_file "$JUNIT_312")" = "$EXPECTED_JUNIT_312_SHA"
+else
+  set +e
+  acceptance_run_312 pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_312"
+  JUNIT_STATUS=$?
+  set -e
+  if test "$JUNIT_STATUS" -ne 0; then
+    test -f "$JUNIT_312"; FAILED_JUNIT_SHA=$(hash_file "$JUNIT_312")
+    JUNIT_RETRY_312="${JUNIT_312%.xml}.retry-${FAILED_JUNIT_SHA:0:12}.xml"
+    test ! -e "$JUNIT_RETRY_312"
+    echo "retained failed JUnit $FAILED_JUNIT_SHA; retry only at $JUNIT_RETRY_312" >&2
+    exit "$JUNIT_STATUS"
+  fi
+fi
+acceptance_run_312 "$FOUNDATION_ACCEPTANCE_ENV_312/bin/python" -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":60,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_312"
 acceptance_run_311 ruff check --no-fix --no-cache src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging
-acceptance_run_311 mypy --cache-dir "$FOUNDATION_ACCEPTANCE_TMP/mypy-py311" src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
+acceptance_run_311 mypy --cache-dir "$FOUNDATION_ACCEPTANCE_TMP/mypy-py311" --python-version 3.11 src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
 acceptance_run_312 ruff check --no-fix --no-cache src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging
-acceptance_run_312 mypy --cache-dir "$FOUNDATION_ACCEPTANCE_TMP/mypy-py312" src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
+acceptance_run_312 mypy --cache-dir "$FOUNDATION_ACCEPTANCE_TMP/mypy-py312" --python-version 3.12 src/cellpose_mcp/release scripts/check_feature_manifest.py scripts/inventory_worktree.py
 acceptance_run_312 python -c 'import subprocess,sys; result=subprocess.run([sys.executable,"scripts/check_feature_manifest.py"],check=False,capture_output=True,text=True); assert result.returncode==0; assert result.stdout=="bootstrap manifest valid; release blockers: 14\n"; assert result.stderr==""'
 acceptance_run_312 python -c 'import subprocess,sys; tools=["get_capabilities","inspect_image","list_models","prepare_model","segment","refine_segmentation","measure_masks","evaluate_segmentation","export_segmentation","train_model","restore_image","get_job","cancel_job"]; result=subprocess.run([sys.executable,"scripts/check_feature_manifest.py","--release"],check=False,capture_output=True,text=True); lines=result.stdout.splitlines(); assert result.returncode==1; assert result.stderr==""; assert len(lines)==14; assert lines[0].startswith("unresolved_core_matrix: core_capability_matrix_unresolved:"); assert [line.split(": ",2)[1] for line in lines[1:]]==tools'
 test "$(/usr/bin/shasum -a 256 "$FOUNDATION_ACCEPTANCE/uv.lock" | /usr/bin/awk '{print $1}')" = "$FOUNDATION_ACCEPTANCE_LOCK_SHA"
@@ -3869,8 +4091,7 @@ test "$(git branch --show-current)" = codex/cellpose-local-first
 git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
-FOUNDATION_ACCEPTANCE_SHA=$(git rev-parse HEAD)
-[[ $FOUNDATION_ACCEPTANCE_SHA =~ ^[0-9a-f]{40}$ ]]
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
 FOUNDATION_RUN_SHA=${FOUNDATION_ACCEPTANCE_SHA:0:12}
 FOUNDATION_ACCEPTANCE=/private/tmp/cellpose-mcp-foundation-acceptance-${FOUNDATION_RUN_SHA}
 export FOUNDATION_ACCEPTANCE
@@ -3897,8 +4118,23 @@ test -x "$FOUNDATION_ACCEPTANCE_ENV_312/bin/python"
 "$FOUNDATION_ACCEPTANCE_ENV_311/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,11)' "$FOUNDATION_ACCEPTANCE_ENV_311" "$PY311"
 "$FOUNDATION_ACCEPTANCE_ENV_312/bin/python" -I -c 'from pathlib import Path; import sys; e=Path(sys.argv[1]); b=Path(sys.argv[2]); assert Path(sys.executable)==e/"bin/python"; assert Path(sys.prefix)==e; assert Path(sys.executable).resolve()==b.resolve(); assert Path(sys._base_executable).resolve()==b.resolve(); assert sys.version_info[:2]==(3,12)' "$FOUNDATION_ACCEPTANCE_ENV_312" "$PY312"
 JUNIT_DISTRIBUTION="$FOUNDATION_ACCEPTANCE_TMP/foundation-distribution-19.xml"
-test ! -e "$JUNIT_DISTRIBUTION"
-/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$FOUNDATION_ACCEPTANCE/src" UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_312" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config run --frozen --offline --no-sync --no-python-downloads --python "$PY312" --extra test --extra dev pytest -p no:cacheprovider tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_DISTRIBUTION"
+EXPECTED_JUNIT_DISTRIBUTION_SHA=d3a56d27b00966319cb0fce66e33d7b889b5ce9a3eb20d784f4e2a2051d55a86
+if test -e "$JUNIT_DISTRIBUTION"; then
+  test -f "$JUNIT_DISTRIBUTION" && test ! -L "$JUNIT_DISTRIBUTION"
+  test "$(hash_file "$JUNIT_DISTRIBUTION")" = "$EXPECTED_JUNIT_DISTRIBUTION_SHA"
+else
+  set +e
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$FOUNDATION_ACCEPTANCE/src" UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_312" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config run --frozen --offline --no-sync --no-python-downloads --python "$PY312" --extra test --extra dev pytest -p no:cacheprovider tests/packaging/test_distribution_contents.py -q --junitxml="$JUNIT_DISTRIBUTION"
+  JUNIT_STATUS=$?
+  set -e
+  if test "$JUNIT_STATUS" -ne 0; then
+    test -f "$JUNIT_DISTRIBUTION"; FAILED_JUNIT_SHA=$(hash_file "$JUNIT_DISTRIBUTION")
+    JUNIT_RETRY_DISTRIBUTION="${JUNIT_DISTRIBUTION%.xml}.retry-${FAILED_JUNIT_SHA:0:12}.xml"
+    test ! -e "$JUNIT_RETRY_DISTRIBUTION"
+    echo "retained failed JUnit $FAILED_JUNIT_SHA; retry only at $JUNIT_RETRY_DISTRIBUTION" >&2
+    exit "$JUNIT_STATUS"
+  fi
+fi
 /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME="$FOUNDATION_ACCEPTANCE_HOME" TMPDIR="$FOUNDATION_ACCEPTANCE_TMP" PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$FOUNDATION_ACCEPTANCE/src" UV_CACHE_DIR="$FOUNDATION_ACCEPTANCE_CACHE" UV_PROJECT_ENVIRONMENT="$FOUNDATION_ACCEPTANCE_ENV_312" UV_NO_CONFIG=1 UV_NO_ENV_FILE=1 UV_PYTHON_DOWNLOADS=never "$UV" --directory "$FOUNDATION_ACCEPTANCE" --project "$FOUNDATION_ACCEPTANCE" --no-config run --frozen --offline --no-sync --no-python-downloads --python "$PY312" --extra test --extra dev python -c 'import sys,xml.etree.ElementTree as ET; r=ET.parse(sys.argv[1]).getroot(); s=[r] if r.tag=="testsuite" else list(r.findall("testsuite")); actual={k:sum(int(x.get(k,"0")) for x in s) for k in ("tests","failures","errors","skipped")}; assert actual=={"tests":19,"failures":0,"errors":0,"skipped":0},actual' "$JUNIT_DISTRIBUTION"
 test "$(hash_file "$FOUNDATION_ACCEPTANCE/uv.lock")" = "$FOUNDATION_ACCEPTANCE_LOCK_SHA"
 for relative in .pytest_cache .ruff_cache .mypy_cache build dist src/cellpose_mcp.egg-info; do
@@ -3926,7 +4162,11 @@ git cat-file -e '45021a2^{commit}'
 git merge-base --is-ancestor 45021a2 HEAD
 git diff --cached --quiet
 EXPECTED_COMMITS=$'ci: enforce truthful repository foundation\ntest: make distribution proof offline\nfix: clarify inventory archive failures'
-test "$(git log -3 --format=%s)" = "$EXPECTED_COMMITS"
+FOUNDATION_ACCEPTANCE_SHA=c926877105873cd9e6c091bb849333800c5cc1ac
+FOUNDATION_ACCEPTANCE_PARENT=d0039330718f4967eb4a023ebb8c463337de72f8
+FOUNDATION_ACCEPTANCE_GRANDPARENT=847e9f2dfd85568d29095e900861b828e01f3fc9
+ACTUAL_COMMITS="$(for commit_sha in "$FOUNDATION_ACCEPTANCE_SHA" "$FOUNDATION_ACCEPTANCE_PARENT" "$FOUNDATION_ACCEPTANCE_GRANDPARENT"; do git show -s --format=%s "$commit_sha"; done)"
+test "$ACTUAL_COMMITS" = "$EXPECTED_COMMITS"
 UV=/Users/suraj/.local/bin/uv
 PY311=/Users/suraj/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/bin/python3.11
 PY312=/Users/suraj/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12
@@ -3939,7 +4179,7 @@ test "$(hash_file "$PY312")" = 6a37ff35c2edec046bd7e5504f4603b93fdbd33166252a324
 test "$(hash_file "$FOUNDATION_ROOT/pyproject.toml")" = f2fec832c75baa77adacf62212e1d5b3f95893e7ff20961c82a71fc3b3a1ec17
 "$PY312" -I -c 'from pathlib import Path; import hashlib; p=Path(".github/workflows/ci.yml").read_bytes(); marker=b"      - name: Pytest\n"; tail=p[p.index(marker):]; assert hashlib.sha256(tail).hexdigest()=="869a85e6af80aefddde2614d0953d96ed1fcbc688f3fb6aaea16ff0ace6ab790"'
 "$PY312" -I -c 'from pathlib import Path; import hashlib; assert hashlib.sha256(Path("tests/test_installation.py").read_bytes()).hexdigest()=="3e4ef691dcb3b7f7f59c8cc5743626a5279d33b3fb848e09f3ff56206c52996d"'
-"$PY312" -I -c 'from pathlib import Path; import subprocess; p=Path(".github/workflows/ci.yml").read_bytes(); marker=b"      - name: Pytest\n"; tail=p[p.index(marker):]; committed=subprocess.check_output(["git","show","HEAD:.github/workflows/ci.yml"]); assert p==committed+tail'
+"$PY312" -I -c 'from pathlib import Path; import subprocess; p=Path(".github/workflows/ci.yml").read_bytes(); marker=b"      - name: Pytest\n"; tail=p[p.index(marker):]; committed=subprocess.check_output(["git","show","c926877105873cd9e6c091bb849333800c5cc1ac:.github/workflows/ci.yml"]); assert p==committed+tail'
 git diff --quiet -- tests/packaging/test_python_policy.py
 FOUNDATION_INVENTORY="$FOUNDATION_ROOT/local_archive/worktree-inventory-20260716T132515.517507Z.json"
 test -f "$FOUNDATION_INVENTORY"
