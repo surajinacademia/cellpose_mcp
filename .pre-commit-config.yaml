@@ -32,13 +32,13 @@ repos:
         args: [--ignore-missing-imports]
         files: ^src/
 
-  # Run quick smoke tests before commit
+  # Run quick tests before commit and fail if pytest is missing or tests fail.
   - repo: local
     hooks:
       - id: pytest-quick
         name: Quick pytest smoke tests
-        entry: bash -c 'if command -v pytest &> /dev/null; then pytest tests/test_tools.py -v -x --tb=short -q 2>/dev/null || true; fi'
+        entry: uv run --frozen --no-sync pytest -m "not slow and not integration"
         language: system
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
         verbose: false

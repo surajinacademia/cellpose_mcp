@@ -6,4 +6,3 @@ include README.md
 include pyproject.toml
 recursive-include src/cellpose_mcp *.py
 include src/cellpose_mcp/py.typed
-include src/cellpose_mcp/features.toml

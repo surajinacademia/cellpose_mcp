@@ -1,26 +1,26 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8.0", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cellpose-mcp"
-version = "0.1.4"
-description = "MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol"
+version = "0.1.5"
+description = "MCP server and CLI for AI-powered Cellpose cell segmentation"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-license = {text = "BSD-3-Clause"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [
     {name = "Suraj Sahu", email = "surajinacademia@users.noreply.github.com"}
 ]
 maintainers = [
     {name = "Suraj Sahu", email = "surajinacademia@users.noreply.github.com"}
 ]
-keywords = ["cellpose", "mcp", "segmentation", "microscopy", "ai", "image-analysis"]
+keywords = ["cellpose", "mcp", "cli", "segmentation", "microscopy", "ai", "image-analysis"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -30,13 +30,12 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=2.10.3,<3",
-    "cellpose>=3.0.0",
+    "cellpose==3.1.1.1",
     "numpy>=1.26.0",
     "imageio>=2.34.0",
     "tifffile>=2021.0.0",
     "typer>=0.9.0",
     "rich>=13.0.0",
-    "pydantic>=2.11,<3",
 ]
 
 [project.urls]
@@ -52,9 +51,9 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-timeout>=2.2.0",
     "pytest-mock>=3.12.0",
+    "pip",
     "build>=1.2,<2",
-    "setuptools>=64",
-    "setuptools_scm>=8.0",
+    "setuptools>=77",
     "wheel",
 ]
 dev = [
@@ -68,20 +67,14 @@ all = ["cellpose-mcp[test,dev]"]
 
 [project.scripts]
 cellpose-mcp = "cellpose_mcp.__main__:main"
+cellpose-mcp-cli = "cellpose_mcp.cli.app:main"
 cellpose-mcp-install = "cellpose_mcp.cli.install:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-cellpose_mcp = ["features.toml", "py.typed"]
-
-[tool.setuptools_scm]
-write_to = "src/cellpose_mcp/_version.py"
-fallback_version = "0.1.0"
-version_scheme = "guess-next-dev"
-local_scheme = "node-and-date"
-tag_regex = "^(?P<prefix>v)?(?P<version>\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$"
+cellpose_mcp = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -89,6 +82,10 @@ addopts = [
     "--strict-markers",
     "--tb=short",
     "--cov-config=.coveragerc",
+    "-p",
+    "no:napari",
+    "-p",
+    "no:napari-plugin-engine",
 ]
 asyncio_mode = "auto"
 testpaths = ["tests"]
@@ -100,6 +97,7 @@ markers = [
     "integration: marks integration tests",
     "unit: marks unit tests",
     "smoke: marks smoke tests for quick validation",
+    "install_e2e: isolated venv + wheel + segmentation (CI install job)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -170,12 +168,16 @@ convention = "numpy"
     "S603",
     "S607",
 ] # CLI intentionally spawns conda / user-selected Python interpreters
+"src/cellpose_mcp/cli/app.py" = [
+    "B008",
+] # Typer command signatures intentionally use Option() defaults
 "tests/**" = [
     "S101",
     "S106",
     "S311",
+    "S603",
     "D",
-] # Allow asserts, hardcoded passwords, random, and skip docstrings in tests
+] # Allow asserts, hardcoded passwords, random, subprocess, and skip docstrings in tests
 
 [tool.ruff.format]
 quote-style = "double"

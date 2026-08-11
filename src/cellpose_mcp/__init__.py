@@ -9,8 +9,15 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 # Also set OMP_NUM_THREADS to prevent potential threading issues
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-__version__ = "0.1.4"
-
-from cellpose_mcp.server import mcp
+__version__ = "0.1.5"
 
 __all__ = ["__version__", "mcp"]
+
+
+def __getattr__(name: str):
+    """Lazily expose the MCP server without importing Cellpose for CLI help."""
+    if name == "mcp":
+        from cellpose_mcp.server import mcp
+
+        return mcp
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

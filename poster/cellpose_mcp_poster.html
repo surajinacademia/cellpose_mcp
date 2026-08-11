@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cellpose-MCP: AI-Tool for Cell Segmentation and Image Analysis in Cellpose and Napari</title>
+  <title>Cellpose-MCP + CLI: Agent-Operated Cell Segmentation</title>
   <style>
     @font-face {
       font-family: 'CMU Sans Serif';
@@ -98,9 +98,9 @@
       color: #ffffff;
       font-size: 80pt;
       font-weight: 800;
-      line-height: 1.1;
+      line-height: 1.15;
       margin: 0 0 20pt 0;
-      letter-spacing: -1pt;
+      letter-spacing: 0;
     }
 
     .poster-title .highlight {
@@ -713,19 +713,18 @@
       <img src="poster_images/mcp_logo.png" class="mcp-logo-small" alt="MCP Logo">
     </div>
     <div class="header-text">
-      <h1 class="poster-title"><span class="highlight">Cellpose-MCP:</span> AI-Tool for Cell Segmentation and Image
-        Analysis in Cellpose and Napari</h1>
+      <h1 class="poster-title"><span class="highlight">Cellpose-MCP + CLI:</span> Agent-Operated Cell Segmentation</h1>
       <p class="authors">Suraj Sahu<sup>1</sup> ssahu2@ucmerced.edu</p>
-      <p class="affiliations"><sup>1</sup>Department of Physics, University of California Merced, CA, USA</p>
+      <p class="affiliations"><sup>1</sup>Department of Physics, University of California Merced, CA, USA &nbsp; | &nbsp; Release v0.1.5</p>
 
       <!-- ==================== ABSTRACT ==================== -->
       <div class="abstract-section">
         <div class="abstract-block">
           <h2 class="abstract-title">Abstract</h2>
-          <p class="abstract-text">Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like
-            Claude, Gemini, etc. to perform cell segmentation through natural language commands. This tool exposes
-            comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing,
-            image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates
+          <p class="abstract-text">Cellpose-mcp provides a command-line interface (CLI) and Model Context Protocol (MCP)
+            server that let scripts and AI assistants operate Cellpose through one shared core. The package exposes
+            11 focused operations, including 2D/3D segmentation, batch processing,
+            image restoration (denoising, deblurring, upsampling), and utilities. The system integrates
             seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
             Researchers can execute sophisticated analysis pipelines by describing their goals in plain English,
             eliminating the need to write complex code or manually tweak Cellpose controls. By combining the generalist
@@ -748,7 +747,7 @@
           <p>Cellpose is a generalist deep learning algorithm for cellular segmentation from microscopy images. It
             segments cell bodies, membranes, and nuclei across diverse microscopy techniques without requiring
             specialized models or parameter tuning. Trained on 70,000+ segmented objects from 608 diverse images,
-            Cellpose provides multiple pretrained models, image restoration capabilities, and custom training support
+            Cellpose provides multiple pretrained models and image restoration capabilities
             <span class="ref">[1]</span>.</p>
 
           <img src="poster_images/cellpose_gui.jpg" class="block-image" alt="Cellpose GUI">
@@ -786,10 +785,9 @@
       <div class="block block-accent-orange">
         <h2 class="block-title">Cellpose-MCP</h2>
         <div class="block-content">
-          <p>Cellpose-mcp is an MCP server that enables AI assistants to perform Cellpose segmentation, image
-            restoration, and model training through natural language commands. Researchers can execute sophisticated
-            workflows using plain English, automate batch processing, and integrate with visualization tools for
-            immediate feedback.</p>
+          <p>Cellpose-mcp gives researchers two interfaces to the same operations: a JSON CLI for reproducible shell
+            workflows and a local stdio MCP server for natural-language agent control. Both support segmentation,
+            restoration, batch processing, and outputs that can be opened in visualization tools.</p>
 
           <div class="key-finding">
             <p>No Coding needed &mdash; Describe your analysis in plain English</p>
@@ -798,7 +796,7 @@
           <div class="arch-flow">
             <div class="arch-box">AI App</div>
             <div class="arch-arrow">&rarr;</div>
-            <div class="arch-box mcp">MCP</div>
+            <div class="arch-box mcp">CLI / MCP</div>
             <div class="arch-arrow">&rarr;</div>
             <div class="arch-box">FastMCP<br>Server</div>
             <div class="arch-arrow">&rarr;</div>
@@ -807,18 +805,18 @@
             <div class="arch-box result">Results</div>
           </div>
 
-          <p><b>Capabilities:</b> cellpose-mcp exposes comprehensive Cellpose functionality through 13+ MCP tools:</p>
+          <p><b>Capabilities:</b> cellpose-mcp exposes 11 shared operations through both CLI and MCP:</p>
           <p><b>Segmentation:</b> <span class="tool-name">segment_cells_2d</span> (2D images, multiple models), <span
               class="tool-name">segment_cells_3d</span> (3D volumes), <span class="tool-name">segment_cells_batch</span>
-            (parallel batch processing)</p>
+            (batch processing)</p>
           <p><b>Image Restoration:</b> <span class="tool-name">denoise_image</span>, <span
               class="tool-name">deblur_image</span>, <span class="tool-name">upsample_image</span>, <span
               class="tool-name">restore_and_segment</span> (combined pipeline)</p>
-          <p><b>Training:</b> <span class="tool-name">train_segmentation_model</span>, <span
-              class="tool-name">train_restoration_model</span> (custom model training)</p>
           <p><b>Utilities:</b> <span class="tool-name">list_available_models</span>, <span
               class="tool-name">estimate_cell_diameter</span>, <span class="tool-name">save_masks</span>, <span
               class="tool-name">load_image_info</span></p>
+          <p><b>v0.1.5 safety:</b> curated model identifiers, verified HTTPS model downloads, and no pickle-backed
+            <span class="tool-name">.npy</span> input.</p>
         </div>
       </div>
 
@@ -892,7 +890,7 @@
             <li><b>Seamless Integration:</b> The AI agent sees what you are seeing and can help you with the analysis</li>
             <li><b>Rapid Prototyping:</b> Prototype workflows conversationally without
               context-switching between tools</li>
-            <li><b>Private and Secure:</b> Your data is not sent to the server and stays on your local machine</li>
+            <li><b>Local Execution:</b> Cellpose reads and writes local files through a stdio MCP process rather than a public service</li>
             <li><b>Intelligent Automation:</b> AI suggests optimal parameters and generates
               batch processing scripts</li>
             <li><b>Workflow Automation:</b> From raw images to quantitative analysis can be done in a one place and the AI agent has context of the entire workflow</li>
@@ -911,7 +909,7 @@
         <div class="block-content">
           <p>Cellpose-mcp can transform scientific software from tools
             requiring technical expertise into conversational partners that amplify researcher capabilities. By
-            combining the generalist power of Cellpose with the natural language interface of modern AI assistants, we
+            combining the generalist power of Cellpose with reproducible CLI commands and modern AI assistants, we
             make sophisticated cell segmentation accessible to a broader scientific community. The integration with
             napari-mcp <span class="ref">[2]</span> enables complete workflows from segmentation to interactive
             visualization, reducing barriers to entry while maintaining the full power of advanced image analysis tools.
@@ -931,44 +929,44 @@
         <div class="block-content">
           <div class="stats-grid">
             <div class="stat-item">
-              <span class="stat-number">13+</span>
-              <span class="stat-label">MCP Tools</span>
+              <span class="stat-number">11</span>
+              <span class="stat-label">Shared Operations</span>
             </div>
             <div class="stat-item">
-              <span class="stat-number">19</span>
+              <span class="stat-number">23</span>
               <span class="stat-label">Pretrained Models</span>
             </div>
             <div class="stat-item">
-              <span class="stat-number">3+</span>
-              <span class="stat-label">File Formats<br><span style="font-size:14pt;">TIFF, PNG, NPY</span></span>
+              <span class="stat-number">2D+3D</span>
+              <span class="stat-label">Segmentation<br><span style="font-size:14pt;">Images and volumes</span></span>
             </div>
             <div class="stat-item">
-              <span class="stat-number" style="font-size:26pt;">Async</span>
-              <span class="stat-label">Thread‑safe, non‑blocking<br><span style="font-size:14pt;">FastMCP backend</span></span>
+              <span class="stat-number" style="font-size:26pt;">Local</span>
+              <span class="stat-label">JSON CLI + stdio MCP<br><span style="font-size:14pt;">One operation core</span></span>
             </div>
           </div>
-          
+
           <p style="margin-top: 20pt; margin-bottom: 10pt;"><b>Supported AI Applications:</b></p>
           <ul style="margin: 0; padding-left: 30pt; list-style: none;">
             <li style="font-size: 22pt; margin-bottom: 8pt;">
               <img src="poster_images/cursor.png" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="Cursor">
-              <b>Cursor IDE</b>  
+              <b>Cursor IDE</b>
             </li>
             <li style="font-size: 22pt; margin-bottom: 8pt;">
               <img src="poster_images/claude.webp" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="Claude">
-              <b>Claude Desktop</b> 
+              <b>Claude Desktop</b>
             </li>
             <li style="font-size: 22pt; margin-bottom: 8pt;">
-              <img src="poster_images/antigravity.png" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="Antigravity">
-              <b>Antigravity</b> — Under Development
+              <img src="poster_images/mcp_logo.png" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="Codex">
+              <b>Codex CLI / App</b>
             </li>
             <li style="font-size: 22pt; margin-bottom: 8pt;">
               <img src="poster_images/claude.webp" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="Claude Code">
-              <b>Claude Code</b>  
+              <b>Claude Code</b>
             </li>
             <li style="font-size: 22pt; margin-bottom: 8pt;">
               <img src="poster_images/vscode_logo.svg" style="height: 20pt; vertical-align: middle; margin-right: 8pt;" alt="VS Code">
-              <b>VS Code</b> 
+              <b>VS Code</b>
             </li>
           </ul>
         </div>
@@ -1043,7 +1041,7 @@
     </div>
     <div class="footer-qr">
       <div class="badges">
-        <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+" class="badge">
+        <img src="https://img.shields.io/badge/python-3.11--3.12-blue.svg" alt="Python 3.11-3.12" class="badge">
         <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg" alt="License: BSD-3-Clause"
           class="badge" style="position: absolute; left: 4204px; top: 41px;">
       </div>

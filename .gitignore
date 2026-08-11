@@ -31,6 +31,7 @@ coverage.xml
 # Development tools
 .mypy_cache/
 .ruff_cache/
+.playwright-cli/
 .bandit
 bandit-report.json
 safety-report.json
@@ -39,6 +40,9 @@ safety-report.json
 .cursor/
 .claude/
 .agent/
+.agents/
+.codex/
+AGENTS.md
 .vscode/
 .idea/
 *.swp
@@ -78,9 +82,21 @@ tmp/
 
 # MCP specific
 claude_desktop_config.json
+.mcp.json
 
 # written by setuptools_scm
 **/_version.py
 
 # Local preservation and inventory reports
 /local_archive/
+
+# Local runs and generated demonstrations
+/results/
+/train_data/
+/untitled folder/
+/segment_and_view.py
+/output/
+/demo_images/*_masks.*
+/demo_images/*_grid.*
+/demo_images/*_side_by_side.*
+/demo_images/sweep_*

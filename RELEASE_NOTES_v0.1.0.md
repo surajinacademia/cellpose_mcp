@@ -9,11 +9,10 @@ This initial release provides a complete MCP server implementation for Cellpose,
 ## 🚀 Features
 
 ### Core Functionality
-- **13+ MCP Tools** for comprehensive Cellpose functionality:
+- **11 MCP Tools** for focused Cellpose functionality:
   - 2D and 3D cell segmentation
   - Batch processing with parallel execution
   - Image restoration (denoising, deblurring, upsampling)
-  - Custom model training for segmentation and restoration
   - Utility tools for model management and image analysis
 
 ### Supported AI Applications
@@ -27,7 +26,7 @@ This initial release provides a complete MCP server implementation for Cellpose,
 - Thread-safe, async FastMCP backend for non-blocking operations
 - Seamless integration with Napari for visualization workflows
 - Support for multiple image formats (TIFF, PNG, NPY)
-- 19 pretrained Cellpose models available
+- 23 curated pretrained Cellpose models available
 - GPU acceleration support enabled by default
 
 ## 📦 Installation

@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-08-10
+
+### Added
+
+- A JSON command-line interface, `cellpose-mcp-cli`, backed by the same operations as the MCP server.
+- Focused regression coverage for 2D and 3D segmentation, restoration, batch processing, CLI behavior, installer safety, and distribution contents.
+
+### Security
+
+- Reject `.npy` inputs before they reach Cellpose's pickle-enabled reader.
+- Restrict model arguments to 23 curated pretrained identifiers, preventing model fields from being interpreted as local paths.
+- Replace Cellpose's certificate-bypassing downloader with verified HTTPS, an official-host allowlist, redirect validation, a size limit, and atomic publication.
+- Resolve installer Python commands to absolute executables and verify installed metadata in isolated mode.
+- Refuse malformed or symlinked MCP configuration targets; publish valid JSON/TOML atomically with private permissions.
+
+### Changed
+
+- Keep a focused set of 11 shared operations across CLI and MCP, including 3D segmentation and restoration.
+- Support Python 3.11 and 3.12 and pin Cellpose to the restoration-compatible `3.1.1.1` release.
+- Make CI and pre-commit checks fail closed against the active code and test suite.
+
+### Removed
+
+- Custom model training operations.
+- The stale feature-manifest release gate and its packaging surface.
+- The tracked machine-specific `.mcp.json` configuration.
+
 ## [0.1.4] - 2026-04-11
 
 ### Fixed
@@ -30,7 +57,7 @@ This is the first stable release of **Cellpose-MCP**, a Model Context Protocol (
 ### Added
 
 #### Core Functionality
-- **13+ MCP Tools** for comprehensive Cellpose functionality:
+- **11 MCP Tools** for focused Cellpose functionality:
   - `segment_cells_2d` - Segment cells in 2D images
   - `segment_cells_3d` - Segment cells in 3D volumes
   - `segment_cells_batch` - Batch process multiple images with parallel execution
@@ -38,9 +65,7 @@ This is the first stable release of **Cellpose-MCP**, a Model Context Protocol (
   - `deblur_image` - Deblur microscopy images
   - `upsample_image` - Upsample low-resolution images
   - `restore_and_segment` - Combined restoration + segmentation
-  - `train_segmentation_model` - Train custom segmentation models
-  - `train_restoration_model` - Train custom restoration models
-  - `list_available_models` - List all 19 pretrained Cellpose models
+  - `list_available_models` - List 23 curated pretrained Cellpose models
   - `estimate_cell_diameter` - Estimate cell diameter from images
   - `save_masks` - Save masks in various formats
   - `load_image_info` - Get image metadata
@@ -56,7 +81,7 @@ This is the first stable release of **Cellpose-MCP**, a Model Context Protocol (
 - Thread-safe, async FastMCP backend for non-blocking operations
 - Seamless integration with Napari for visualization workflows
 - Support for multiple image formats (TIFF, PNG, NPY)
-- 19 pretrained Cellpose models available
+- 23 curated pretrained Cellpose models available
 - GPU acceleration support enabled by default
 - Auto-installation CLI tool (`cellpose-mcp-install`) for easy setup
 
@@ -151,3 +176,5 @@ This project was inspired by [napari-mcp](https://github.com/royerlab/napari-mcp
 [0.1.1]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.1
 [0.1.2]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.2
 [0.1.3]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.3
+[0.1.4]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.4
+[0.1.5]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.5

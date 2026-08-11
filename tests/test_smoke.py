@@ -33,3 +33,14 @@ def test_tools_are_plain_callables_after_unwrap() -> None:
     assert isinstance(tools.segment_cells_2d, types.FunctionType)
     wrapped = tools._segment_cells_2d_tool
     assert getattr(wrapped, "fn", wrapped) is tools.segment_cells_2d
+
+
+@pytest.mark.smoke
+async def test_mcp_surface_excludes_training() -> None:
+    """The simplified MCP surface should not expose model training."""
+    from cellpose_mcp.server import mcp
+
+    tool_names = set(await mcp.get_tools())
+
+    assert "segment_cells_3d" in tool_names
+    assert "train_segmentation_model" not in tool_names

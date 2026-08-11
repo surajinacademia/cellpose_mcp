@@ -1,4 +1,4 @@
-name: Foundation CI
+name: CI
 
 on:
   push:
@@ -6,12 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  foundation:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -21,13 +24,12 @@ jobs:
 
     env:
       PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -35,34 +37,16 @@ jobs:
       - name: Install locked environment
         run: |
           python -m pip install "uv==0.10.4"
-          uv sync --locked --no-install-project --no-build --python "${{ matrix.python-version }}" --extra test --extra dev
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          uv sync --locked --python "${{ matrix.python-version }}" --extra test --extra dev
 
-      - name: Foundation contract
-        run: |
-          uv lock --check --offline --no-python-downloads --no-config
-          uv run --frozen --offline --no-sync --no-python-downloads --no-config --python "${{ matrix.python-version }}" --extra test --extra dev python -c "import sys; assert f'{sys.version_info.major}.{sys.version_info.minor}' == '${{ matrix.python-version }}'"
-          uv run --frozen --offline --no-sync --no-python-downloads --no-config --python "${{ matrix.python-version }}" --extra test --extra dev python scripts/check_feature_manifest.py
-          uv run --frozen --offline --no-sync --no-python-downloads --no-config --python "${{ matrix.python-version }}" --extra test --extra dev pytest -p no:cacheprovider tests/dev/test_inventory_worktree.py tests/contract/test_feature_manifest.py tests/packaging/test_python_policy.py tests/packaging/test_distribution_contents.py -q
+      - name: Check lock file
+        run: uv lock --check
 
-      - name: Ruff foundation
-        run: >
-          uv run --frozen --offline --no-sync --no-python-downloads --no-config
-          --python "${{ matrix.python-version }}"
-          --extra test --extra dev ruff check --no-fix --no-cache
-          src/cellpose_mcp/release
-          scripts/check_feature_manifest.py
-          scripts/inventory_worktree.py
-          tests/dev/test_inventory_worktree.py
-          tests/contract/test_feature_manifest.py
-          tests/packaging
+      - name: Lint
+        run: uv run --frozen --no-sync ruff check src/ tests/ scripts/
 
-      - name: Mypy foundation
-        run: >
-          uv run --frozen --offline --no-sync --no-python-downloads --no-config
-          --python "${{ matrix.python-version }}"
-          --extra test --extra dev mypy
-          --cache-dir "${{ runner.temp }}/mypy-${{ matrix.python-version }}"
-          --python-version "${{ matrix.python-version }}"
-          src/cellpose_mcp/release scripts/check_feature_manifest.py
-          scripts/inventory_worktree.py
+      - name: Type check
+        run: uv run --frozen --no-sync mypy src/cellpose_mcp --ignore-missing-imports
+
+      - name: Test
+        run: uv run --frozen --no-sync pytest -m "not slow"

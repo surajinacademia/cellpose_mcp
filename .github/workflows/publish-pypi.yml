@@ -1,16 +1,3 @@
-# Publish source + wheel to PyPI when a release tag is pushed (e.g. v0.1.5).
-#
-# Setup (one-time on https://pypi.org ):
-#   1. Project → Settings → Publishing → "Add a new pending publisher"
-#   2. Provider: GitHub
-#   3. Repository owner + name: must match this repo (e.g. surajinacademia/cellpose_mcp)
-#   4. Workflow name: publish-pypi.yml  (this file)
-#   5. Environment name: leave blank unless you add `environment: pypi` below and create
-#      a matching GitHub Environment — then use the same name on PyPI.
-#   6. Save; PyPI will allow OIDC uploads from that workflow only.
-#
-# After that, tagging triggers this workflow; no long-lived API token in GitHub secrets.
-
 name: Publish to PyPI
 
 on:
@@ -20,26 +7,56 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
-      - name: Install build
-        run: pip install --upgrade pip build
+      - name: Install locked environment
+        run: |
+          python -m pip install "uv==0.10.4"
+          uv sync --locked --extra test --extra dev
 
-      - name: Build sdist and wheel
-        run: python -m build
+      - name: Verify tag and project version
+        run: |
+          PROJECT_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "$GITHUB_REF_NAME" = "v$PROJECT_VERSION"
+
+      - name: Test and lint
+        run: |
+          uv run --frozen --no-sync ruff check src/ tests/ scripts/
+          uv run --frozen --no-sync pytest -m "not slow"
+
+      - name: Build distributions
+        run: uv run --frozen --no-sync python -m build --no-isolation
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: distributions
+          path: dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist/
