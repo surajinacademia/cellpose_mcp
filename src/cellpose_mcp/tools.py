@@ -30,32 +30,103 @@ def _unwrap_mcp_tool(wrapped: Any) -> Any:
     return getattr(wrapped, "__wrapped__", wrapped)
 
 
-# Predefined model types
-PRETRAINED_MODELS = [
+# Pretrained model types supported by Cellpose 3.1.1.2.
+SEGMENTATION_MODELS = [
     "cyto",
     "cyto2",
     "cyto3",
     "nuclei",
-    "bact",
-    "tissuenet",
-    "livecell",
-    "yeast",
-    "denoise_cyto2",
-    "denoise_cyto3",
-    "denoise_nuclei",
-    "deblur_cyto2",
-    "deblur_cyto3",
-    "upsample_cyto2",
-    "upsample_cyto3",
-    "oneclick_cyto2",
-    "oneclick_cyto3",
+    "tissuenet_cp3",
+    "livecell_cp3",
+    "yeast_PhC_cp3",
+    "yeast_BF_cp3",
+    "bact_phase_cp3",
+    "bact_fluor_cp3",
+    "deepbacs_cp3",
 ]
+RESTORATION_MODELS = {
+    "denoise": ["denoise_cyto3", "denoise_cyto2", "denoise_nuclei"],
+    "deblur": ["deblur_cyto3", "deblur_cyto2", "deblur_nuclei"],
+    "upsample": ["upsample_cyto3", "upsample_cyto2", "upsample_nuclei"],
+    "oneclick": ["oneclick_cyto3", "oneclick_cyto2", "oneclick_nuclei"],
+}
+PRETRAINED_MODELS = SEGMENTATION_MODELS + [
+    model for category in RESTORATION_MODELS.values() for model in category
+]
+DIAMETER_MODELS = ["cyto3", "nuclei", "cyto2", "cyto"]
+
+
+def _require_model(model: str, allowed: list[str], kind: str) -> None:
+    """Reject unknown model identifiers before Cellpose silently falls back."""
+    if model not in allowed:
+        choices = ", ".join(allowed)
+        raise ValueError(
+            f"unsupported {kind} model {model!r}; choose one of: {choices}"
+        )
+
+
+def _require_segmentation_model(model: str) -> None:
+    """Accept a supported identifier or an existing custom model file."""
+    if model in SEGMENTATION_MODELS or Path(model).is_file():
+        return
+    _require_model(model, SEGMENTATION_MODELS, "segmentation")
+
+
+def _unpack_cellpose_model_result(result: Any) -> tuple[Any, Any, Any]:
+    """Unpack the Cellpose 3 ``CellposeModel.eval`` result.
+
+    Cellpose 3 returns ``(masks, flows, styles)`` from ``CellposeModel``.
+    Styles are feature vectors, not diameter estimates.
+    """
+    if not isinstance(result, tuple):
+        return result, None, None
+    if len(result) != 3:
+        raise ValueError(
+            "CellposeModel.eval returned "
+            f"{len(result)} values; expected masks, flows, and styles"
+        )
+    return result
+
+
+def _finite_scalar(value: Any) -> float | None:
+    """Return the first finite numeric value, or ``None`` when unavailable."""
+    if value is None:
+        return None
+    try:
+        values = np.asarray(value).reshape(-1)
+        if values.size == 0:
+            return None
+        numeric_value = float(values[0])
+    except (TypeError, ValueError):
+        return None
+    return numeric_value if np.isfinite(numeric_value) else None
+
+
+def _reported_diameter(requested_diameter: float, model: Any) -> float:
+    """Report an explicit diameter or the model's documented default diameter."""
+    requested_value = _finite_scalar(requested_diameter)
+    if requested_value is not None and requested_value > 0:
+        return requested_value
+
+    for attribute in ("diam_mean", "diam_labels"):
+        model_value = _finite_scalar(getattr(model, attribute, None))
+        if model_value is not None and model_value > 0:
+            return model_value
+    return 0.0
+
+
+def _flow_quality(flows: Any) -> float:
+    """Return a best-effort mean cell-probability score from Cellpose flows."""
+    if not isinstance(flows, (list, tuple)) or len(flows) <= 2:
+        return 0.0
+    quality = _finite_scalar(np.mean(flows[2]))
+    return quality if quality is not None else 0.0
 
 
 @mcp.tool()
 def segment_cells_2d(
     image_path: str,
-    model_type: str = "cpsam",
+    model_type: str = "cyto3",
     diameter: float = 0,
     channels: list[int] | None = None,
     flow_threshold: float = 0.4,
@@ -72,7 +143,7 @@ def segment_cells_2d(
     Args:
         image_path: Path to input image file (TIFF, PNG, etc.)
         model_type: Cellpose model type (cyto, cyto2, cyto3, nuclei, etc.)
-        diameter: Expected cell diameter in pixels (0 = auto-estimate)
+        diameter: Expected cell diameter in pixels (0 = model default)
         channels: Channel specification [cyto, nuclei] or None for grayscale
         flow_threshold: Flow error threshold (lower = more masks, may be worse quality)
         cellprob_threshold: Cell probability threshold (higher = fewer masks)
@@ -88,18 +159,16 @@ def segment_cells_2d(
         Dictionary with segmentation results including cells_detected, output_path, diameter, mask_shape
     """
     try:
+        _require_segmentation_model(model_type)
         # Load image
         img = io.imread(image_path)
         if img.ndim > 2 and img.shape[-1] > 4:
             img = img[:, :, :4]  # Limit to 4 channels max
 
-        # Initialize model
-        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
-        # may show a warning but still works for compatibility with user expectations.
+        # ``CellposeModel`` supplies segmentation only; its CP3 result has no diameter.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
-        # Run segmentation
-        # Convert diameter=0 to None for auto-estimation (Cellpose v4 requirement)
+        # ``None`` selects the model's built-in diameter in Cellpose 3.
         diameter_param = None if diameter == 0 else diameter
         result = model.eval(
             img,
@@ -113,18 +182,7 @@ def segment_cells_2d(
             invert=invert,
         )
 
-        # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
-        if isinstance(result, tuple):
-            if len(result) == 3:
-                masks, flows, diams = result
-            elif len(result) == 4:
-                masks, flows, _, diams = result
-            else:
-                raise ValueError(f"Unexpected number of return values: {len(result)}")
-        else:
-            masks = result
-            flows = None
-            diams = None
+        masks, flows, _styles = _unpack_cellpose_model_result(result)
 
         # Determine output path
         if output_path is None:
@@ -136,14 +194,14 @@ def segment_cells_2d(
 
         # Count cells (exclude background label 0)
         n_cells = len(np.unique(masks)) - 1 if masks is not None else 0
-        diameter_used = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0])
+        diameter_used = _reported_diameter(diameter, model)
 
         return {
             "cells_detected": int(n_cells),
             "output_path": output_path,
             "diameter": diameter_used,
             "mask_shape": list(masks.shape) if masks is not None else [],
-            "flow_quality": float(np.mean(flows[2])) if flows and len(flows) > 2 else 0.0,
+            "flow_quality": _flow_quality(flows),
         }
     except Exception as e:
         return {"error": str(e), "cells_detected": 0}
@@ -152,7 +210,7 @@ def segment_cells_2d(
 @mcp.tool()
 def segment_cells_3d(
     image_path: str,
-    model_type: str = "cpsam",
+    model_type: str = "cyto3",
     diameter: float = 0,
     do_3d: bool = True,
     anisotropy: float | None = None,
@@ -181,16 +239,14 @@ def segment_cells_3d(
         Dictionary with 3D segmentation results
     """
     try:
+        _require_segmentation_model(model_type)
         # Load 3D image
         img = io.imread(image_path)
 
-        # Initialize model
-        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
-        # may show a warning but still works for compatibility with user expectations.
+        # ``CellposeModel`` supplies segmentation only; its CP3 result has no diameter.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
-        # Run 3D segmentation
-        # Convert diameter=0 to None for auto-estimation (Cellpose v4 requirement)
+        # ``None`` selects the model's built-in diameter in Cellpose 3.
         diameter_param = None if diameter == 0 else diameter
         result = model.eval(
             img,
@@ -202,17 +258,7 @@ def segment_cells_3d(
             flow3D_smooth=flow3d_smooth,
         )
 
-        # Handle Cellpose v4 API - returns 3 values (masks, flows, diams)
-        if isinstance(result, tuple):
-            if len(result) == 3:
-                masks, _, diams = result
-            elif len(result) == 4:
-                masks, _, _, diams = result
-            else:
-                raise ValueError(f"Unexpected number of return values: {len(result)}")
-        else:
-            masks = result
-            diams = None
+        masks, _flows, _styles = _unpack_cellpose_model_result(result)
 
         # Determine output path
         if output_path is None:
@@ -223,7 +269,7 @@ def segment_cells_3d(
         io.imsave(output_path, masks)
 
         n_cells = len(np.unique(masks)) - 1 if masks is not None else 0
-        diameter_used = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0])
+        diameter_used = _reported_diameter(diameter, model)
 
         return {
             "cells_detected": int(n_cells),
@@ -240,7 +286,7 @@ def segment_cells_3d(
 @mcp.tool()
 def segment_cells_batch(
     image_paths: list[str],
-    model_type: str = "cpsam",
+    model_type: str = "cyto3",
     diameter: float = 0,
     output_dir: str | None = None,
     gpu: bool = True,
@@ -261,19 +307,19 @@ def segment_cells_batch(
         Dictionary with batch processing results
     """
     try:
-        # Initialize model once (use pretrained_model for Cellpose v4+)
-        model = models.CellposeModel(gpu=gpu, pretrained_model=model_type)
+        _require_segmentation_model(model_type)
+        # Initialize the requested Cellpose 3 model once for the entire batch.
+        model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
         results = []
         for img_path in image_paths:
             try:
                 img = io.imread(img_path)
-                # Convert diameter=0 to None for auto-estimation
+                # ``None`` selects the model's built-in diameter in Cellpose 3.
                 diameter_param = None if diameter == 0 else diameter
                 result = model.eval(img, diameter=diameter_param, batch_size=batch_size)
 
-                # Handle Cellpose v4 API return values
-                masks = result[0] if isinstance(result, tuple) else result
+                masks, _flows, _styles = _unpack_cellpose_model_result(result)
 
                 # Determine output path
                 img_path_obj = Path(img_path)
@@ -331,10 +377,11 @@ def denoise_image(
         Dictionary with denoising results
     """
     try:
+        _require_model(model_type, RESTORATION_MODELS["denoise"], "denoise")
         img = io.imread(image_path)
 
-        # Initialize denoising model
-        model = DenoiseModel(gpu=gpu, pretrained_model=model_type)
+        # CP3 uses ``model_type`` for built-in restoration identifiers.
+        model = DenoiseModel(gpu=gpu, model_type=model_type)
 
         # Denoise image
         restored = model.eval(img, channels=channels, diameter=diameter)
@@ -381,9 +428,11 @@ def deblur_image(
         Dictionary with deblurring results
     """
     try:
+        _require_model(model_type, RESTORATION_MODELS["deblur"], "deblur")
         img = io.imread(image_path)
 
-        model = DenoiseModel(gpu=gpu, pretrained_model=model_type)
+        # CP3 uses ``model_type`` for built-in restoration identifiers.
+        model = DenoiseModel(gpu=gpu, model_type=model_type)
         restored = model.eval(img, channels=channels, diameter=diameter)
 
         if output_path is None:
@@ -426,10 +475,18 @@ def upsample_image(
         Dictionary with upsampling results
     """
     try:
+        _require_model(model_type, RESTORATION_MODELS["upsample"], "upsample")
+        if scale_factor not in (2, 4):
+            raise ValueError("scale_factor must be 2 or 4")
         img = io.imread(image_path)
 
-        model = DenoiseModel(gpu=gpu, pretrained_model=model_type)
-        upsampled = model.eval(img, channels=channels)
+        # CP3 upsampling uses ``diameter`` to determine the interpolation ratio.
+        model = DenoiseModel(gpu=gpu, model_type=model_type)
+        model_diameter = _reported_diameter(0, model)
+        if model_diameter <= 0:
+            model_diameter = 30.0
+        upsampling_diameter = model_diameter / float(scale_factor)
+        upsampled = model.eval(img, channels=channels, diameter=upsampling_diameter)
 
         if output_path is None:
             img_path = Path(image_path)
@@ -475,18 +532,26 @@ def restore_and_segment(
         Dictionary with combined restoration and segmentation results
     """
     try:
+        _require_model(
+            restoration_model, RESTORATION_MODELS["oneclick"], "oneclick"
+        )
+        _require_segmentation_model(segmentation_model)
         img = io.imread(image_path)
 
-        # Use CellposeDenoiseModel for combined pipeline
+        # CP3 keeps the segmentation and restoration model identifiers separate.
         model = CellposeDenoiseModel(
-            gpu=gpu, pretrained_model=restoration_model, model_type=segmentation_model
+            gpu=gpu, restore_type=restoration_model, model_type=segmentation_model
         )
 
-        # Run restoration + segmentation (diameter=None for auto-estimate)
+        # The CP3 combined model returns masks, flows, styles, and the restored image.
         diameter_param = None if diameter == 0 else diameter
-        masks, flows, styles, diams, restored = model.eval(
-            img, diameter=diameter_param, channels=channels, restore=True
-        )
+        result = model.eval(img, diameter=diameter_param, channels=channels)
+        if not isinstance(result, tuple) or len(result) != 4:
+            raise ValueError(
+                "CellposeDenoiseModel.eval returned an unexpected result; "
+                "expected masks, flows, styles, and restored image"
+            )
+        masks, _flows, _styles, restored = result
 
         # Determine output paths
         img_path = Path(image_path)
@@ -500,7 +565,7 @@ def restore_and_segment(
         io.imsave(output_path_restored, restored)
 
         n_cells = len(np.unique(masks)) - 1 if masks is not None else 0
-        diameter_used = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0])
+        diameter_used = _reported_diameter(diameter, getattr(model, "cp", model))
 
         return {
             "cells_detected": int(n_cells),
@@ -551,6 +616,8 @@ def train_segmentation_model(
 
         from cellpose import train
 
+        _require_segmentation_model(model_type)
+
         # Cellpose expects images and masks in the same directory (image_filter/_img,
         # mask_filter/_masks). Build a combined dir when separate dirs are given.
         def _combined_data_dir(images_dir: str, labels_dir: str) -> tuple[str, tempfile.TemporaryDirectory | None]:
@@ -591,9 +658,7 @@ def train_segmentation_model(
                 if test_tmp is not None:
                     test_tmp.cleanup()
 
-        # Initialize model
-        # Note: Cellpose v4 defaults to 'cpsam' model. The model_type parameter
-        # may show a warning but still works for compatibility with user expectations.
+        # Initialize the requested Cellpose 3 model.
         model = models.CellposeModel(gpu=gpu, model_type=model_type)
 
         # Determine output directory
@@ -601,8 +666,8 @@ def train_segmentation_model(
             output_dir = os.getcwd()
         os.makedirs(output_dir, exist_ok=True)
 
-        # Train model (Cellpose v4 uses channel_axis, not channels)
-        train.train_seg(
+        # Cellpose 3 returns the actual path written below ``output_dir/models``.
+        model_path, _train_losses, _test_losses = train.train_seg(
             model.net,
             train_data,
             train_labels,
@@ -612,12 +677,11 @@ def train_segmentation_model(
             n_epochs=n_epochs,
             learning_rate=learning_rate,
             batch_size=batch_size,
+            model_name=model_name,
         )
 
-        model_path = os.path.join(output_dir, f"{model_name}.pth")
-
         return {
-            "model_path": model_path,
+            "model_path": str(model_path),
             "model_name": model_name,
             "n_epochs": n_epochs,
             "training_images": len(train_data),
@@ -637,21 +701,19 @@ def list_available_models() -> dict[str, Any]:
         Dictionary with lists of available models by category
     """
     return {
-        "segmentation_models": ["cyto", "cyto2", "cyto3", "nuclei", "bact", "tissuenet", "livecell", "yeast"],
+        "segmentation_models": list(SEGMENTATION_MODELS),
         "restoration_models": {
-            "denoise": ["denoise_cyto2", "denoise_cyto3", "denoise_nuclei"],
-            "deblur": ["deblur_cyto2", "deblur_cyto3"],
-            "upsample": ["upsample_cyto2", "upsample_cyto3"],
-            "oneclick": ["oneclick_cyto2", "oneclick_cyto3"],
+            category: list(model_names)
+            for category, model_names in RESTORATION_MODELS.items()
         },
-        "all_models": PRETRAINED_MODELS,
+        "all_models": list(PRETRAINED_MODELS),
     }
 
 
 @mcp.tool()
 def estimate_cell_diameter(
     image_path: str,
-    model_type: str = "cpsam",
+    model_type: str = "cyto3",
     channels: list[int] | None = None,
     gpu: bool = True,
 ) -> dict[str, Any]:
@@ -668,16 +730,20 @@ def estimate_cell_diameter(
         Dictionary with estimated diameter and confidence
     """
     try:
+        _require_model(model_type, DIAMETER_MODELS, "diameter-estimation")
         img = io.imread(image_path)
 
-        # Initialize model with size estimation
-        model = models.CellposeModel(gpu=gpu, model_type=model_type)
+        # ``Cellpose`` combines CellposeModel with the CP3 size model.
+        model = models.Cellpose(gpu=gpu, model_type=model_type)
         result = model.eval(img, channels=channels, diameter=None)
 
-        # Handle Cellpose v4 API return values (diams is always the last tuple element)
-        diams = result[-1] if isinstance(result, tuple) else None
-
-        diameter_est = float(diams) if isinstance(diams, (int, float, np.number)) else float(diams[0]) if diams is not None else 0.0
+        if not isinstance(result, tuple) or len(result) != 4:
+            raise ValueError(
+                "Cellpose.eval returned an unexpected result; "
+                "expected masks, flows, styles, and diameters"
+            )
+        _masks, _flows, _styles, diams = result
+        diameter_est = _finite_scalar(diams) or 0.0
 
         return {
             "estimated_diameter": diameter_est,

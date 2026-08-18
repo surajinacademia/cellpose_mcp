@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-08-17
+
+### Fixed
+
+- Server startup with fresh installations by pinning the restoration-compatible
+  Cellpose 3.1.1.2 release.
+- Cellpose 3 model selection for denoising, deblurring, and upsampling.
+- Combined restoration and segmentation arguments and return-value handling.
+- Cellpose 3 segmentation and diameter result handling.
+- Pretrained model identifiers that previously caused silent `cyto3` fallback.
+- Training results now report the model path written by Cellpose.
+- Python 3.10 installation on macOS now avoids an incompatible SciPy wheel.
+
+### Changed
+
+- Default segmentation and diameter models now use `cyto3`, the compatible
+  Cellpose 3 model.
+- Upsampling accepts the tested 2x and 4x factors.
+- Supported Python versions are limited to the tested 3.10 through 3.12 range.
+- Cellpose 4 support is deferred because Cellpose-SAM does not provide the
+  restoration API exposed by this server.
+
 ## [0.1.4] - 2026-04-11
 
 ### Fixed
@@ -151,3 +173,5 @@ This project was inspired by [napari-mcp](https://github.com/royerlab/napari-mcp
 [0.1.1]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.1
 [0.1.2]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.2
 [0.1.3]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.3
+[0.1.4]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.4
+[0.1.5]: https://github.com/surajinacademia/cellpose_mcp/releases/tag/v0.1.5
