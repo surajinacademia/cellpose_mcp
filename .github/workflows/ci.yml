@@ -32,9 +32,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[test,dev]"
+          python -m pip check
+          python -c 'from importlib.metadata import version; assert version("cellpose") == "3.1.1.2"'
 
       - name: Ruff
-        run: ruff check src/ tests/
+        run: ruff check --no-fix src/ tests/
 
       - name: Pytest
         run: pytest -m "not slow" --tb=short

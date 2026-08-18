@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8.0", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cellpose-mcp"
-version = "0.1.4"
+version = "0.1.5"
 description = "MCP server for AI-powered Cellpose cell segmentation via Model Context Protocol"
 readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "BSD-3-Clause"}
+requires-python = ">=3.10,<3.13"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [
     {name = "Suraj Sahu", email = "surajinacademia@users.noreply.github.com"}
 ]
@@ -20,7 +21,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -31,8 +31,9 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=2.10.3,<3",
-    "cellpose>=3.0.0",
+    "cellpose==3.1.1.2",
     "numpy>=1.26.0",
+    "scipy<1.15; python_version < '3.11' and sys_platform == 'darwin'",
     "imageio>=2.34.0",
     "tifffile>=2021.0.0",
     "typer>=0.9.0",
@@ -68,13 +69,6 @@ cellpose-mcp-install = "cellpose_mcp.cli.install:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools_scm]
-write_to = "src/cellpose_mcp/_version.py"
-fallback_version = "0.1.0"
-version_scheme = "guess-next-dev"
-local_scheme = "node-and-date"
-tag_regex = "^(?P<prefix>v)?(?P<version>\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$"
 
 [tool.pytest.ini_options]
 addopts = [
@@ -151,7 +145,7 @@ ignore = [
     "S101",   # assert detected - allow in tests
     "S110",   # try-except-pass - acceptable for best-effort operations
     "SIM105", # contextlib.suppress - prefer explicit try/except
-    "TCH003", # typing-only imports - not critical
+    "TC003",  # typing-only imports - not critical
     "D401",   # imperative mood - not critical
 ]
 
@@ -160,8 +154,13 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "src/cellpose_mcp/cli/install.py" = [
+    "D406",
+    "D407",
+    "F541",
     "S603",
     "S607",
+    "UP015",
+    "UP024",
 ] # CLI intentionally spawns conda / user-selected Python interpreters
 "tests/**" = [
     "S101",

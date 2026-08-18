@@ -14,7 +14,11 @@ Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants
 
 ### 🚀 Quick Start
 
-**Requirements:** Python 3.10 or later (use a virtual environment or conda).
+**Requirements:** Python 3.10, 3.11, or 3.12 and Cellpose 3.1.1.2.
+
+Cellpose 4 does not include the restoration API used by this server. The
+package pins the final Cellpose 3 release until restoration has a tested
+replacement.
 
 **Install from PyPI:**
 
