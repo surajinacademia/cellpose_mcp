@@ -90,4 +90,4 @@ The [changelog](CHANGELOG.md) lists each release.
 
 Built on [Cellpose](https://github.com/MouseLand/cellpose) by Carsen Stringer, Marius Pachitariu, and colleagues; please cite Cellpose when you publish results. [napari-mcp](https://github.com/royerlab/napari-mcp) by the Royer lab inspired the design, and the server uses [FastMCP](https://github.com/jlowin/fastmcp). Written by [Suraj Sahu](https://physics.ucmerced.edu/content/suraj-sahu), University of California, Merced.
 
-BSD-3-Clause; see [LICENSE](LICENSE).
+The code is BSD-3-Clause; see [LICENSE](LICENSE). The example images are Cellpose's and are for non-commercial use; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -82,3 +82,8 @@ claude_desktop_config.json
 # written by setuptools_scm
 **/_version.py
  
+# Local agent rules and machine configuration (never published)
+/AGENTS.md
+/CLAUDE.md
+/.mcp.json
+*.code-workspace
