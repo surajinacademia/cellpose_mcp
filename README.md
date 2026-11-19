@@ -1,197 +1,93 @@
 # Cellpose MCP Server
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![PyPI](https://img.shields.io/pypi/v/cellpose-mcp.svg)](https://pypi.org/project/cellpose-mcp/)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
 
-Cellpose-mcp is a Model Context Protocol (MCP) server that enables AI assistants like Claude, Cursor IDE, etc. to perform cell segmentation through natural language commands. This tool exposes comprehensive Cellpose functionality through 13+ MCP tools, including 2D/3D segmentation, batch processing, image restoration (denoising, deblurring, upsampling), and custom model training. The system integrates seamlessly with Napari, enabling complete workflows from segmentation to interactive visualization.
+An MCP server that lets an AI assistant segment cells and nuclei with [Cellpose](https://github.com/MouseLand/cellpose): in 2D or 3D, one image or a folder, with optional denoising, deblurring, or upsampling first, and with your own trained models.
 
+| Raw image | Segmented by the assistant |
+| --- | --- |
+| ![Fluorescence image with green cytoplasm and blue nuclei](poster/poster_images/img00.png) | ![The same image with each cell outlined and its centre marked](poster/poster_images/img00_annotated_overlay.png) |
 
-![Cellpose-MCP Research Poster](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/cellpose_mcp_poster.png)
+## Tools
 
+| Tool | What it does |
+| --- | --- |
+| `load_image_info` | Reports an image's shape, data type, and channels. |
+| `list_available_models` | Lists the Cellpose models you can use. |
+| `estimate_cell_diameter` | Estimates the typical cell diameter, in pixels. |
+| `segment_cells_2d` | Segments cells in one 2D image. |
+| `segment_cells_3d` | Segments cells in a 3D volume. |
+| `segment_cells_batch` | Segments every image in a folder. |
+| `denoise_image`, `deblur_image`, `upsample_image` | Restore an image before segmenting it. |
+| `restore_and_segment` | Restores and segments in one step. |
+| `save_masks` | Saves masks (TIFF, PNG, or NumPy) with an outline PNG and an overlay PNG. |
+| `train_segmentation_model` | Trains a model on your own images and masks. |
 
-> **📌 Note**: This project started as a fun project inspired by [napari-mcp](https://github.com/royerlab/napari-mcp) and adapted for [Cellpose](https://github.com/MouseLand/cellpose) segmentation workflows. If you would like to contribute then please get in touch with me at [ssahu2@ucmerced.edu](mailto:ssahu2@ucmerced.edu).
+For images with more than one channel, say which axis holds the channels (`channel_axis`) and which channels are the cell and the nuclear signal (`channels`, counted from 1). The server does not guess.
 
-### 🚀 Quick Start
+## Install
 
-**Requirements:** Python 3.10, 3.11, or 3.12 and Cellpose 3.1.1.2.
-
-Cellpose 4 does not include the restoration API used by this server. The
-package pins the final Cellpose 3 release until restoration has a tested
-replacement.
-
-**Install from PyPI:**
+Needs Python 3.10, 3.11, or 3.12. It installs Cellpose 3.1.1.2; Cellpose 4 lacks the restoration tools.
 
 ```bash
 pip install cellpose-mcp
 ```
 
-**Install and configure for Cursor in one go:**
+## Connect
+
+**Claude Code**
 
 ```bash
-pip install cellpose-mcp && cellpose-mcp-install cursor
+claude mcp add cellpose -e KMP_DUPLICATE_LIB_OK=TRUE -e OMP_NUM_THREADS=1 -- cellpose-mcp
 ```
 
-The installer uses the Python that runs the command (or a conda env named `Cellpose_mcp` if present). Restart Cursor after configuring.
-
-**Development install (from source):**
+**Codex**
 
 ```bash
-git clone https://github.com/surajinacademia/cellpose_mcp.git
-cd cellpose_mcp
-pip install -e .
+codex mcp add cellpose --env KMP_DUPLICATE_LIB_OK=TRUE --env OMP_NUM_THREADS=1 -- cellpose-mcp
 ```
 
-### Auto-Configure Your AI Application
-
-After `pip install cellpose-mcp`, run the installer for your app. It writes to the correct MCP config file using your current Python.
-
-| Application | Command | Notes |
-| ----------- | ------- | ----- |
-| **Cursor IDE** | `cellpose-mcp-install cursor` | Writes to `~/.cursor/mcp.json` |
-| **Claude Desktop** | `cellpose-mcp-install claude-desktop` | Adds to Claude Desktop config |
-| **Antigravity** | `cellpose-mcp-install antigravity` | Configures Antigravity MCP |
-| **VS Code (Cline/Roo Cline)** | `cellpose-mcp-install vscode` | Configures Cline/Roo Cline extension |
-| **Claude Code** | Manual only | See [Manual Configuration](#manual-configuration-for-claude-code) below |
-
-Options: `--python-path /path/to/python` to use a specific Python; `--env-name NAME` to use a conda env (default: `Cellpose_mcp`).
-
-<details>
-<summary>Manual Configuration for Claude Code</summary>
-
-If you prefer manual setup (or use Claude Code), create a `.mcp.json` file in your project root. Use the full path to your Python executable if `python` is not the one that has `cellpose-mcp` installed (e.g. a venv or conda):
+**Claude Desktop, Cursor, Gemini CLI, and Antigravity** use the same entry:
 
 ```json
 {
   "mcpServers": {
     "cellpose": {
-      "command": "python",
-      "args": ["-m", "cellpose_mcp"],
-      "env": {
-        "KMP_DUPLICATE_LIB_OK": "TRUE",
-        "OMP_NUM_THREADS": "1"
-      }
+      "command": "cellpose-mcp",
+      "env": { "KMP_DUPLICATE_LIB_OK": "TRUE", "OMP_NUM_THREADS": "1" }
     }
   }
 }
 ```
 
-For **Cursor**, use the same structure in `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in your project.
-</details>
+| Client | Where the entry goes |
+| --- | --- |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart the app |
+| Cursor | `~/.cursor/mcp.json`, or `.cursor/mcp.json` in a project |
+| Gemini CLI | `~/.gemini/settings.json`, or `.gemini/settings.json` in a project |
+| Antigravity | Agent panel `…` menu → MCP Servers → Manage MCP Servers → View raw config |
 
-After installation, restart your AI app and try asking:
+`cellpose-mcp-install cursor` (or `claude-desktop`, `antigravity`, `claude-code`, `vscode`) writes the entry for you. If a client cannot find `cellpose-mcp`, use the full path that `which cellpose-mcp` prints.
 
-```text
-"Can you list available Cellpose models?"
-"Segment the cells in ./data/sample.tif using the cyto2 model"
+## Use
+
+> List the available Cellpose models, then segment the cells in `/data/sample.tif` with cyto2 and save the masks next to it.
+
+> Denoise `/data/noisy.tif`, segment it, and tell me how many cells you found.
+
+## Development
+
+```bash
+git clone https://github.com/surajinacademia/cellpose_mcp && cd cellpose_mcp
+pip install -e '.[test,dev]'
+pytest -m 'not slow'
 ```
 
-## 🎯 What Can You Do?
+The [changelog](CHANGELOG.md) lists each release.
 
-### Example: Cell Segmentation in Action
+## Credits and license
 
-<table>
-<tr>
-<td width="50%">
-<img src="https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00.png" alt="Original fluorescence microscopy image" />
-<p align="center"><em>Original Image: Fluorescence microscopy with green-stained cytoplasm and blue-stained nuclei</em></p>
-</td>
-<td width="50%">
-<img src="https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00_annotated_overlay.png" alt="Segmented cells with annotations" />
-<p align="center"><em>Segmented Result: Cells automatically detected with boundaries and labels</em></p>
-</td>
-</tr>
-</table>
+Built on [Cellpose](https://github.com/MouseLand/cellpose) by Carsen Stringer, Marius Pachitariu, and colleagues; please cite Cellpose when you publish results. [napari-mcp](https://github.com/royerlab/napari-mcp) by the Royer lab inspired the design, and the server uses [FastMCP](https://github.com/jlowin/fastmcp). Written by [Suraj Sahu](https://physics.ucmerced.edu/content/suraj-sahu), University of California, Merced.
 
-### Basic Cell Segmentation
-
-```text
-"Segment the cells in ./data/sample.tif using the cyto2 model"
-"List available Cellpose models"
-"Estimate cell diameter from ./data/image.tif"
-```
-
-### Advanced Workflows
-
-```text
-"Segment all TIFF files in ./data/images/ and save masks to ./output/"
-"Train a custom segmentation model using images in ./train/images/ and masks in ./train/masks/"
-"Restore and segment the noisy image in ./data/noisy.tif using oneclick_cyto3"
-```
-
-### Batch Processing
-
-```text
-"Process all images in ./data/ with the cyto2 model and save results to ./output/"
-```
-
-## 🛠 Available MCP Tools
-
-The server exposes 13+ tools for complete Cellpose functionality:
-
-### Segmentation Tools
-
-- **`segment_cells_2d`** - Segment cells in 2D images
-- **`segment_cells_3d`** - Segment cells in 3D volumes
-- **`segment_cells_batch`** - Batch process multiple images
-
-### Image Restoration Tools
-
-- **`denoise_image`** - Denoise microscopy images
-- **`deblur_image`** - Deblur microscopy images
-- **`upsample_image`** - Upsample low-resolution images
-- **`restore_and_segment`** - Combined restoration + segmentation
-
-### Training Tools
-
-- **`train_segmentation_model`** - Train custom segmentation model
-- **`train_restoration_model`** - Train custom restoration model
-
-### Utility Tools
-
-- **`list_available_models`** - List all pretrained models
-- **`estimate_cell_diameter`** - Estimate cell diameter from image
-- **`save_masks`** - Save masks in various formats
-- **`load_image_info`** - Get image metadata
-
-## 📖 Documentation
-
-- **[Quick Start Guide](#-quick-start)** - Get running in 3 steps
-- **[Available Tools](#-available-mcp-tools)** - Complete tool list
-- **[Release Notes](https://github.com/surajinacademia/cellpose_mcp/blob/main/RELEASE_NOTES_v0.1.0.md)** - Detailed v0.1.0 release information
-- **[Changelog](https://github.com/surajinacademia/cellpose_mcp/blob/main/CHANGELOG.md)** - Version history and changes
-
-
-## 📋 Architecture
-
-- **FastMCP Server**: Handles MCP protocol communication
-- **Cellpose Integration**: Manages model loading and segmentation operations
-- **Tool Layer**: Exposes Cellpose functionality as MCP tools
-- **File I/O**: Handles image reading, writing, and mask generation
-
-Key features:
-
-- **Thread-safe**: All operations are properly serialized
-- **Non-blocking**: Async operations for better performance
-- **Napari Integration**: Integration with Napari for visualization and analysis
-
-
-**Author:** [Suraj Sahu](https://physics.ucmerced.edu/content/suraj-sahu)  
-**Affiliation:** Department of Physics, University of California Merced, CA, USA  
-**Email:** ssahu2@ucmerced.edu
-
-
-## 📄 License
-
-BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
-
-
-## 🙏 Acknowledgments
-
-- **[Napari MCP](https://github.com/royerlab/napari-mcp)** by [royerlab](https://github.com/royerlab)
-- [Cellpose team](https://github.com/MouseLand/cellpose) for the excellent segmentation library
-- [FastMCP](https://github.com/jlowin/fastmcp) for the MCP framework
-- [Anthropic](https://www.anthropic.com/) for Claude and MCP development
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Open standard for AI-tool integration
-
----
+BSD-3-Clause; see [LICENSE](LICENSE).
