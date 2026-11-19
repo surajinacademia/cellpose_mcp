@@ -1,0 +1,297 @@
+[
+  {
+    "id": "t01",
+    "title": "Grayscale nuclei s01",
+    "kind": "segment",
+    "source_ids": [
+      "s01"
+    ],
+    "inputs": [
+      "s01.tif"
+    ],
+    "ground_truth": [
+      "s01.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t02",
+    "title": "Grayscale nuclei s02",
+    "kind": "segment",
+    "source_ids": [
+      "s02"
+    ],
+    "inputs": [
+      "s02.tif"
+    ],
+    "ground_truth": [
+      "s02.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t03",
+    "title": "Grayscale nuclei s03",
+    "kind": "segment",
+    "source_ids": [
+      "s03"
+    ],
+    "inputs": [
+      "s03.tif"
+    ],
+    "ground_truth": [
+      "s03.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t04",
+    "title": "Grayscale nuclei s04",
+    "kind": "segment",
+    "source_ids": [
+      "s04"
+    ],
+    "inputs": [
+      "s04.tif"
+    ],
+    "ground_truth": [
+      "s04.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t05",
+    "title": "Grayscale nuclei s05",
+    "kind": "segment",
+    "source_ids": [
+      "s05"
+    ],
+    "inputs": [
+      "s05.tif"
+    ],
+    "ground_truth": [
+      "s05.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t06",
+    "title": "Grayscale nuclei s06",
+    "kind": "segment",
+    "source_ids": [
+      "s06"
+    ],
+    "inputs": [
+      "s06.tif"
+    ],
+    "ground_truth": [
+      "s06.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in the grayscale image {input0}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t07",
+    "title": "Six-channel CYX nuclei",
+    "kind": "segment",
+    "source_ids": [
+      "s01"
+    ],
+    "inputs": [
+      "channels_first.tif"
+    ],
+    "ground_truth": [
+      "s01.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      6,
+      0
+    ],
+    "channel_axis": 0,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in {input0}, a six-channel CYX image with channel_axis=0. Use channel 6 (one-based) as the signal and no secondary channel, channels=[6,0]. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t08",
+    "title": "Six-channel YXC nuclei",
+    "kind": "segment",
+    "source_ids": [
+      "s01"
+    ],
+    "inputs": [
+      "channels_last.tif"
+    ],
+    "ground_truth": [
+      "s01.tif"
+    ],
+    "expected_outputs": [
+      "result_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      6,
+      0
+    ],
+    "channel_axis": -1,
+    "expected_status": "completed",
+    "instruction": "Segment nuclei in {input0}, a six-channel YXC image with channel_axis=-1. Use channel 6 (one-based) as the signal and no secondary channel, channels=[6,0]. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t09",
+    "title": "Two-image nuclei batch",
+    "kind": "batch",
+    "source_ids": [
+      "s05",
+      "s06"
+    ],
+    "inputs": [
+      "s05.tif",
+      "s06.tif"
+    ],
+    "ground_truth": [
+      "s05.tif",
+      "s06.tif"
+    ],
+    "expected_outputs": [
+      "s05_masks.tif",
+      "s06_masks.tif"
+    ],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Batch-segment nuclei in the grayscale images {input0} and {input1}. Use the nuclei model on CPU, model-default diameter, normalization enabled, and default segmentation thresholds. Save label masks to {output_dir}/s05_masks.tif and {output_dir}/s06_masks.tif respectively."
+  },
+  {
+    "id": "t10",
+    "title": "Nuclei diameter estimate",
+    "kind": "diameter",
+    "source_ids": [
+      "s03"
+    ],
+    "inputs": [
+      "s03.tif"
+    ],
+    "ground_truth": [
+      "s03.tif"
+    ],
+    "expected_outputs": [],
+    "model_type": "nuclei",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "completed",
+    "instruction": "Estimate the typical (median) nucleus diameter in pixels, defined as the area-equivalent circle diameter, in the grayscale image {input0} using the nuclei size model on CPU. Report the diameter in pixels and explain the limits of confidence in the estimate."
+  },
+  {
+    "id": "t11",
+    "title": "Ambiguous image axes",
+    "kind": "ambiguous",
+    "source_ids": [
+      "s04"
+    ],
+    "inputs": [
+      "s07.tif"
+    ],
+    "ground_truth": [
+      "s04.tif"
+    ],
+    "expected_outputs": [],
+    "model_type": "nuclei",
+    "channels": null,
+    "channel_axis": null,
+    "expected_status": "needs_clarification",
+    "instruction": "Segment nuclei in {input0} using the nuclei model and save the label mask to {output_dir}/result_masks.tif."
+  },
+  {
+    "id": "t12",
+    "title": "Explicit Cellpose-SAM model",
+    "kind": "unsupported",
+    "source_ids": [
+      "s02"
+    ],
+    "inputs": [
+      "s02.tif"
+    ],
+    "ground_truth": [
+      "s02.tif"
+    ],
+    "expected_outputs": [],
+    "model_type": "cpsam",
+    "channels": [
+      0,
+      0
+    ],
+    "channel_axis": null,
+    "expected_status": "unsupported",
+    "instruction": "Segment nuclei in the grayscale image {input0} specifically using the cpsam model, and save the label mask to {output_dir}/result_masks.tif. Do not substitute another model if cpsam is unavailable."
+  }
+]

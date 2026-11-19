@@ -1,13 +1,14 @@
 # Cellpose MCP Server
 
+[![CI](https://github.com/surajinacademia/cellpose_mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/surajinacademia/cellpose_mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/cellpose-mcp.svg)](https://pypi.org/project/cellpose-mcp/)
-[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/surajinacademia/cellpose_mcp/blob/main/LICENSE)
 
 An MCP server that lets an AI assistant segment cells and nuclei with [Cellpose](https://github.com/MouseLand/cellpose): in 2D or 3D, one image or a folder, with optional denoising, deblurring, or upsampling first, and with your own trained models.
 
 | Raw image | Segmented by the assistant |
 | --- | --- |
-| ![Fluorescence image with green cytoplasm and blue nuclei](poster/poster_images/img00.png) | ![The same image with each cell outlined and its centre marked](poster/poster_images/img00_annotated_overlay.png) |
+| ![Fluorescence image with green cytoplasm and blue nuclei](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00.png) | ![The same image with each cell outlined and its centre marked](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00_annotated_overlay.png) |
 
 ## Tools
 
@@ -76,6 +77,10 @@ codex mcp add cellpose --env KMP_DUPLICATE_LIB_OK=TRUE --env OMP_NUM_THREADS=1 -
 
 > Denoise `/data/noisy.tif`, segment it, and tell me how many cells you found.
 
+## Evaluation
+
+A Codex agent ran 12 segmentation tasks through this server on six annotated nuclei images from the public BBBC039 dataset, three times each, alongside a direct Cellpose script that does not use the server. The agent completed all 36 workflows, its masks were pixel-identical to the direct script's in all 30 paired outputs, and it asked for clarification or refused correctly whenever a task required it. Against the annotations, Cellpose reached an object F1 of 0.93–0.97 on five images and 0.44 on one sparse image, in both arms. The [evaluation](https://github.com/surajinacademia/cellpose_mcp/tree/main/evaluation/pilot-2026-10) has the design, the per-run and per-image scores, and the limits.
+
 ## Development
 
 ```bash
@@ -84,10 +89,10 @@ pip install -e '.[test,dev]'
 pytest -m 'not slow'
 ```
 
-The [changelog](CHANGELOG.md) lists each release.
+The [changelog](https://github.com/surajinacademia/cellpose_mcp/blob/main/CHANGELOG.md) lists each release.
 
 ## Credits and license
 
 Built on [Cellpose](https://github.com/MouseLand/cellpose) by Carsen Stringer, Marius Pachitariu, and colleagues; please cite Cellpose when you publish results. [napari-mcp](https://github.com/royerlab/napari-mcp) by the Royer lab inspired the design, and the server uses [FastMCP](https://github.com/jlowin/fastmcp). Written by [Suraj Sahu](https://physics.ucmerced.edu/content/suraj-sahu), University of California, Merced.
 
-The code is BSD-3-Clause; see [LICENSE](LICENSE). The example images are Cellpose's and are for non-commercial use; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The code is BSD-3-Clause; see [LICENSE](https://github.com/surajinacademia/cellpose_mcp/blob/main/LICENSE). The example images are Cellpose's and are for non-commercial use; see [THIRD_PARTY_NOTICES.md](https://github.com/surajinacademia/cellpose_mcp/blob/main/THIRD_PARTY_NOTICES.md).

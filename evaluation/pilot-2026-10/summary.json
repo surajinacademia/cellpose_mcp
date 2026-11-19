@@ -1,0 +1,45 @@
+{
+  "by_arm": {
+    "agent_mcp": {
+      "runs": 36,
+      "workflow_passes": 36,
+      "workflow_pass_rate": 1.0,
+      "annotation_scored_runs": 30,
+      "annotation_passes": 24,
+      "annotation_pass_rate": 0.8,
+      "overall_qualified_runs": 30,
+      "overall_qualified_rate": 0.8333333333333334,
+      "false_operational_successes": 0,
+      "runs_with_scientific_violations": 0,
+      "human_interventions_received": 0,
+      "intervention_requests": 6,
+      "tool_calls": 75,
+      "total_tokens": 1591245,
+      "median_elapsed_seconds": 31.020954479492502
+    },
+    "reference": {
+      "runs": 36,
+      "workflow_passes": 36,
+      "workflow_pass_rate": 1.0,
+      "annotation_scored_runs": 30,
+      "annotation_passes": 24,
+      "annotation_pass_rate": 0.8,
+      "overall_qualified_runs": 30,
+      "overall_qualified_rate": 0.8333333333333334,
+      "false_operational_successes": 0,
+      "runs_with_scientific_violations": 0,
+      "human_interventions_received": 0,
+      "intervention_requests": 6,
+      "tool_calls": 0,
+      "total_tokens": 0,
+      "median_elapsed_seconds": 3.881449833512306
+    }
+  },
+  "sources": [
+    "tasks.json",
+    "manifest.json",
+    "scores.json"
+  ],
+  "manual_claim_review_status": "passed",
+  "manual_claim_review_source": "manual_claim_review.json"
+}
