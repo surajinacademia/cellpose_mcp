@@ -11,3 +11,7 @@ These images are subject to the [HHMI Research Content Terms and Conditions](htt
 ## Cellpose
 
 The server calls [Cellpose](https://github.com/MouseLand/cellpose) at run time and installs it as a dependency under its own license. Some Cellpose models were trained on data with non-commercial terms; check the Cellpose documentation before commercial use.
+
+## Walkthrough poster
+
+The logo and images in `walkthrough/poster.pdf` and `walkthrough/poster.png` keep their own terms; [walkthrough/SOURCES.md](walkthrough/SOURCES.md) lists each source and license.
