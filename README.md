@@ -10,6 +10,8 @@ An MCP server that lets an AI assistant segment cells and nuclei with [Cellpose]
 | --- | --- |
 | ![Fluorescence image with green cytoplasm and blue nuclei](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00.png) | ![The same image with each cell outlined and its centre marked](https://raw.githubusercontent.com/surajinacademia/cellpose_mcp/main/poster/poster_images/img00_annotated_overlay.png) |
 
+A one-page [walkthrough poster (PDF)](https://github.com/surajinacademia/cellpose_mcp/blob/main/walkthrough/poster.pdf) walks you step by step from setup to your first results, for people who use AI apps but do not code.
+
 ## Tools
 
 | Tool | What it does |
